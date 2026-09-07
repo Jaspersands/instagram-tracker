@@ -1,0 +1,29 @@
+# ---- NEVER COMMIT PERSONAL DATA ----
+# The database contains your full social graph and DM history.
+data/
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Raw Instagram exports and bookmarklet captures
+exports/
+captures/
+*.zip
+instagram-*/
+meta-*/
+
+# Local config (may contain absolute paths to your watched folders)
+.env
+.env.local
+config.local.json
+
+# ---- standard ----
+node_modules/
+dist/
+build/
+.vite/
+coverage/
+*.log
+.DS_Store
