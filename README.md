@@ -77,6 +77,21 @@ npm run report -- lurkers   # accounts you watch constantly and never engage wit
 The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`, and
 the dashboard port with `PORT=`.
 
+### Trying it before your export arrives
+
+`data/demo.db` holds a synthetic two-snapshot dataset — 199 followers, 3
+unfollowers, a username change, DM threads and captured likes — so you can click
+around before your real export lands:
+
+```bash
+IG_DB=data/demo.db npm run serve
+```
+
+It is deliberately kept under a separate filename. Ingesting your real export into
+it would diff your genuine followers against 199 invented ones and report about
+two hundred unfollowers who never existed. Plain `npm run serve` uses
+`data/instagram.db`, which starts empty and is the one you want.
+
 **Keep the original archive filenames.** Instagram names them
 `instagram-<user>-YYYY-MM-DD-<hash>.zip`, and that date is used to date the
 snapshot — it is far more reliable than the file's modified time, which changes
