@@ -48,10 +48,19 @@ Ingest one archive (idempotent — re-ingesting the same file is a no-op):
 npm run ingest -- ~/Downloads/instagram-export.zip
 ```
 
-Watch a folder and ingest anything that lands in it:
+Watch a folder and ingest anything that lands in it. New exports and bookmarklet
+captures are both picked up, and **you get a desktop notification naming who
+unfollowed you**:
 
 ```bash
 npm run watch -- ~/Dropbox/Instagram
+```
+
+Check where things stand — snapshot count, how stale your last export is, and
+what is still unmeasured:
+
+```bash
+npm run status
 ```
 
 Open the dashboard:

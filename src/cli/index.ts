@@ -6,6 +6,8 @@ import { isCaptureFile } from '../parse/capture.js';
 import { unfollowers, lurkGap } from '../report/reports.js';
 import { watchFolder } from '../watch/watcher.js';
 import { buildServer } from '../server/server.js';
+import { status, formatStatus } from '../report/status.js';
+import { notify, unfollowerMessage } from '../notify/notify.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 const [cmd, ...args] = process.argv.slice(2);
@@ -58,6 +60,11 @@ switch (cmd) {
     break;
   }
 
+  case 'status': {
+    console.log(formatStatus(status(openDb(DB_PATH), now())));
+    break;
+  }
+
   case 'serve': {
     const port = Number(process.env.PORT ?? 4317);
     const app = buildServer(openDb(DB_PATH));
@@ -75,13 +82,17 @@ switch (cmd) {
     await watchFolder(db, dir, ({ zipPath, lost, captured }) => {
       console.log(`ingested ${zipPath}`);
       if (captured !== undefined) console.log(`  ${captured} inbound row(s) captured`);
-      if (lost.length) console.log(`  ${lost.length} unfollower(s): ${lost.join(', ')}`);
+      if (lost.length) {
+        console.log(`  ${lost.length} unfollower(s): ${lost.join(', ')}`);
+        const msg = unfollowerMessage(lost);
+        if (msg) notify('Instagram Tracker', msg);
+      }
     });
     break;
   }
 
   default:
     console.error(`unknown command: ${cmd ?? '(none)'}`);
-    console.error('commands: inventory <zip> | ingest <zip|capture.json> | report [unfollowers|lurkers] | serve | watch <dir>');
+    console.error('commands: status | inventory <zip> | ingest <zip|capture.json> | report [unfollowers|lurkers] | serve | watch <dir>');
     process.exit(1);
 }
