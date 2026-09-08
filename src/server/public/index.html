@@ -140,6 +140,17 @@ svg { display:block; max-width:100%; }
     <div class="scroll"><table id="unf"></table></div>
   </section>
 
+  <section id="tab-inbound" hidden>
+    <div class="card">
+      <h2>Who engages with you</h2>
+      <p class="note">Not in the export — Instagram scopes exports to your own actions, so
+      this comes from lists you capture yourself.
+      <a href="/bookmarklet" style="color:var(--s1)">Get the bookmarklet →</a></p>
+      <div id="captures"></div>
+    </div>
+    <div id="inbound-body"></div>
+  </section>
+
   <section id="tab-lurk" hidden>
     <div class="card"><h2>Lurk gap</h2>
       <p class="note">Accounts whose posts you see constantly and never engage with.</p></div>
@@ -190,7 +201,8 @@ svg { display:block; max-width:100%; }
 <script>
 const TABS = [
   ['overview','Overview'], ['people','People'], ['unfollowers','Unfollowers'],
-  ['lurk','Lurk gap'], ['decay','Going quiet'], ['habits','Habits'], ['taste','Taste'],
+  ['inbound','Inbound'], ['lurk','Lurk gap'], ['decay','Going quiet'],
+  ['habits','Habits'], ['taste','Taste'],
 ];
 const $ = (s) => document.querySelector(s);
 const el = (t, a = {}, kids = []) => {
@@ -452,6 +464,7 @@ TABS.forEach(([id, label]) => {
     TABS.forEach(([t]) => { $('#tab-' + t).hidden = t !== id; });
     if (id === 'overview') lineChart('#trend', STATE.overview.snapshots);
     if (id === 'habits') { heatmap('#heat', STATE.habits.heatmap); barChart('#months', STATE.habits.byMonth); }
+    if (id === 'inbound') loadInbound();
   };
   nav.append(b);
 });
@@ -496,6 +509,54 @@ function renderPeople() {
     { k: 'score', t: 'closeness', num: true, render: (r) => relScore(r.score),
       title: 'Relative to your strongest tie (100). Recency-decayed: DM 5, comment 4, save 3, story like 2.5, like 2' },
   ], rows, { sort: 'score', empty: 'No people yet — ingest an export first.', onRow: (r) => openPerson(r.username) });
+}
+
+async function loadInbound() {
+  const d = await get('/api/inbound');
+  const caps = $('#captures'); caps.innerHTML = '';
+  const body = $('#inbound-body'); body.innerHTML = '';
+
+  if (!d.captures.length) {
+    caps.append(el('p', { class: 'empty',
+      text: 'Nothing captured yet. Open one of your posts, click its likes, scroll the list, and hit Save.' }));
+    return;
+  }
+  caps.append(el('p', { class: 'sub',
+    text: `${d.captures.length} capture${d.captures.length === 1 ? '' : 's'} · ` +
+          d.captures.map((c) => `${c.kind.replace('_', ' ')} (${c.people})`).join(' · ') }));
+
+  const card = (title, note, id) => {
+    const c = el('div', { class: 'card' }, [
+      el('h2', { text: title }), el('p', { class: 'note', text: note }),
+    ]);
+    const wrap = el('div', { class: 'scroll' }, el('table', { id }));
+    c.append(wrap); body.append(c); return c;
+  };
+
+  card('Superfans', 'Ranked by how much they engage with you.', 'sf');
+  table('#sf', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'likesReceived', t: 'likes given you', num: true },
+    { k: 'commentsReceived', t: 'comments', num: true },
+    { k: 'storyViews', t: 'story views', num: true },
+    { k: 'total', t: 'total', num: true },
+  ], d.superfans, { sort: 'total', empty: 'No inbound engagement captured.' });
+
+  card('Ghost followers',
+    'Follow you, yet appear in none of the lists you have captured. Confidence grows with how many posts you capture.',
+    'gh');
+  table('#gh', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'followedSince', t: 'following you since', render: (r) => fmtDate(r.followedSince) },
+  ], d.ghosts, { sort: 'followedSince', asc: true, empty: 'No ghosts — everyone who follows you has engaged.' });
+
+  card('Reciprocity', 'Biggest imbalances first. Positive means you give more than you get.', 'rc');
+  table('#rc', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'youGive', t: 'you → them', num: true },
+    { k: 'theyGive', t: 'them → you', num: true },
+    { k: 'gap', t: 'gap', num: true },
+  ], d.reciprocity, { sort: 'gap', empty: 'Nothing to compare yet.' });
 }
 
 async function loadDecay() {

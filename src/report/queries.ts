@@ -24,11 +24,26 @@ function latestSnapshotId(db: Db): number | null {
   return (db.prepare('SELECT MAX(id) AS id FROM snapshot').get() as { id: number | null }).id;
 }
 
+/**
+ * account_id -> surviving account id. A username change creates a second account
+ * row linked by merged_into; without this map the person's history is split
+ * across both and the live row looks like a stranger who has never interacted.
+ */
+function canonicalIds(db: Db): Map<number, number> {
+  const rows = db.prepare('SELECT id, merged_into AS mergedInto FROM account')
+    .all() as { id: number; mergedInto: number | null }[];
+  const m = new Map<number, number>();
+  for (const r of rows) m.set(r.id, r.mergedInto ?? r.id);
+  return m;
+}
+
 export function people(db: Db, now: number): PersonRow[] {
   const accounts = db.prepare(
     'SELECT id, username FROM account WHERE merged_into IS NULL',
   ).all() as { id: number; username: string }[];
   if (accounts.length === 0) return [];
+
+  const canon = canonicalIds(db);
 
   const latest = latestSnapshotId(db);
 
@@ -52,11 +67,17 @@ export function people(db: Db, now: number): PersonRow[] {
     else iFollow.add(e.accountId);
   }
 
-  const viewMap = new Map(views.map((v) => [v.accountId, v.n]));
+  const viewMap = new Map<number, number>();
+  for (const v of views) {
+    const id = canon.get(v.accountId) ?? v.accountId;
+    viewMap.set(id, (viewMap.get(id) ?? 0) + v.n);
+  }
+
   const byAccount = new Map<number, InterRow[]>();
   for (const r of inter) {
-    const list = byAccount.get(r.accountId);
-    if (list) list.push(r); else byAccount.set(r.accountId, [r]);
+    const id = canon.get(r.accountId) ?? r.accountId;
+    const list = byAccount.get(id);
+    if (list) list.push(r); else byAccount.set(id, [r]);
   }
 
   return accounts.map((a) => {
@@ -199,4 +220,75 @@ export function person(db: Db, username: string, now: number) {
   ).all(username) as { kind: string; occurredAt: number | null; confidence: number }[];
 
   return { row, timeline, events };
+}
+
+/**
+ * Inbound engagement — the half the export cannot supply, assembled from
+ * bookmarklet captures.
+ */
+export function inbound(db: Db, now: number) {
+  const captures = db.prepare(
+    `SELECT c.id AS id, c.kind AS kind, c.permalink AS permalink,
+            c.captured_at AS capturedAt,
+            (SELECT COUNT(*) FROM interaction i
+              WHERE i.direction = 'in'
+                AND i.permalink IS c.permalink
+                AND i.occurred_at = c.captured_at) AS people
+       FROM inbound_capture c ORDER BY c.captured_at DESC`,
+  ).all() as { id: number; kind: string; permalink: string | null; capturedAt: number; people: number }[];
+
+  // With nothing captured, "has never engaged" is unknown rather than true.
+  // Accusing every follower of being a ghost would be the worst possible default.
+  if (captures.length === 0) {
+    return { captures: [], ghosts: [], superfans: [], reciprocity: [] };
+  }
+
+  const latest = latestSnapshotId(db);
+
+  const ghosts = latest === null ? [] : (db.prepare(
+    `SELECT a.username AS username, f.since AS followedSince
+       FROM account a
+       JOIN follow_edge f ON f.account_id = a.id
+        AND f.direction = 'follows_me' AND f.snapshot_id = ?
+      WHERE a.merged_into IS NULL
+        AND NOT EXISTS (
+              SELECT 1 FROM interaction i
+                JOIN account a2 ON a2.id = i.account_id
+               WHERE COALESCE(a2.merged_into, a2.id) = a.id
+                 AND i.direction = 'in')
+      ORDER BY f.since ASC`,
+  ).all(latest) as { username: string; followedSince: number | null }[]);
+
+  // Engagement with your *content* only. Inbound DMs are real closeness but
+  // belong in the People table, not here — counting them made a DM-only friend
+  // the top "superfan" with zero likes, and the total stopped matching its parts.
+  const superfans = db.prepare(
+    `SELECT can.username AS username,
+            SUM(CASE WHEN i.kind = 'like_received'    THEN 1 ELSE 0 END) AS likesReceived,
+            SUM(CASE WHEN i.kind = 'comment_received' THEN 1 ELSE 0 END) AS commentsReceived,
+            SUM(CASE WHEN i.kind = 'story_view'       THEN 1 ELSE 0 END) AS storyViews,
+            COUNT(*) AS total
+       FROM interaction i
+       JOIN account a   ON a.id = i.account_id
+       JOIN account can ON can.id = COALESCE(a.merged_into, a.id)
+      WHERE i.direction = 'in'
+        AND i.kind IN ('like_received','comment_received','story_view')
+      GROUP BY can.id ORDER BY total DESC LIMIT 200`,
+  ).all() as {
+    username: string; likesReceived: number; commentsReceived: number;
+    storyViews: number; total: number;
+  }[];
+
+  const reciprocity = people(db, now)
+    .map((p) => {
+      const sf = superfans.find((s) => s.username === p.username);
+      const theyGive = sf ? sf.total : 0;
+      const youGive = p.likes + p.comments + p.storyLikes + p.saves + p.dmOut;
+      return { username: p.username, youGive, theyGive, gap: youGive - theyGive };
+    })
+    .filter((r) => r.youGive > 0 || r.theyGive > 0)
+    .sort((a, b) => Math.abs(b.gap) - Math.abs(a.gap))
+    .slice(0, 200);
+
+  return { captures, ghosts, superfans, reciprocity };
 }

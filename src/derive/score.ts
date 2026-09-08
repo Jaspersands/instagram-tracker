@@ -6,6 +6,9 @@ export const DECAY_DAYS = 90;
 export const WEIGHTS: Record<string, number> = {
   dm: 5,
   comment: 4,
+  comment_received: 4,
+  like_received: 2,
+  story_view: 0.5,
   save: 3,
   mention: 3,
   like_story: 2.5,

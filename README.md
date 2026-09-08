@@ -102,13 +102,38 @@ hashtags, search history, your posting cadence.
 story like 2.5, like 2, with a 90-day decay constant), shown relative to your
 strongest tie so the column stays readable no matter how old your data is.
 
+## Capturing who engages with you
+
+The export contains everything *you* did, but nothing about who engaged with
+*you* — that lives in other people's exports. A bookmarklet fills the gap.
+
+Start the dashboard and open **http://127.0.0.1:4317/bookmarklet**, then drag the
+button to your bookmarks bar. On one of your own posts, click the likes count,
+**scroll the list to the bottom yourself**, and hit Save. Ingest it with:
+
+```bash
+npm run ingest -- ~/Downloads/ig-capture-post_likes-1757000000.json
+```
+
+or just let `npm run watch` pick it up.
+
+**Why this is safe:** the bookmarklet makes **zero network requests** and **never
+scrolls for you**. It reads text your browser already drew because you scrolled,
+so Instagram cannot distinguish it from you looking at the page. That is
+categorically different from a tool that logs in and enumerates lists in the
+background, which is what gets accounts disabled. Tests in
+`tests/server/bookmarklet.test.ts` enforce both properties so a future edit
+cannot quietly break them.
+
+This unlocks the **Inbound** tab: superfans, measured ghost followers (follow you
+but appear in none of your captures), and reciprocity.
+
 ## What cannot be tracked, and why
 
-- **Who likes or comments on *your* posts.** Meta scopes exports to your own
-  actions, so those live in the other person's export. Coming in Plan 3 via a
-  bookmarklet that reads lists you have opened yourself.
-- **Profile views and story viewers.** Not available to personal accounts through
-  any route.
+- **Profile views.** Not available to personal accounts through any route.
+- **Story viewers beyond 24 hours.** They must be captured inside the window.
+- **Likes on posts you never capture.** Ghost detection is only as confident as
+  the number of posts you have captured — it says so in the tab.
 - **Exact unfollow timing.** Resolution is however often you export.
 - **Username changes** read as churn, since the export has no stable user ID.
   Mitigated: a renamed follower keeps their original follow timestamp, so an

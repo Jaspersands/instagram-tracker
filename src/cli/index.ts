@@ -1,6 +1,8 @@
 import { inventory, formatInventory } from '../archive/inventory.js';
 import { openDb } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
+import { ingestCapture } from '../ingest/ingest.js';
+import { isCaptureFile } from '../parse/capture.js';
 import { unfollowers, lurkGap } from '../report/reports.js';
 import { watchFolder } from '../watch/watcher.js';
 import { buildServer } from '../server/server.js';
@@ -18,8 +20,19 @@ switch (cmd) {
   }
 
   case 'ingest': {
-    if (!args[0]) { console.error('usage: ingest <archive.zip>'); process.exit(1); }
-    const r = await ingestAndDerive(openDb(DB_PATH), args[0]);
+    if (!args[0]) { console.error('usage: ingest <archive.zip | ig-capture-*.json>'); process.exit(1); }
+    const db = openDb(DB_PATH);
+
+    // Accept bookmarklet captures here too, not only through the watcher.
+    if (isCaptureFile(args[0])) {
+      const c = await ingestCapture(db, args[0]);
+      console.log(c.skipped
+        ? 'not a valid capture file'
+        : `capture ${c.captureId}: ${c.rows} new inbound row(s)`);
+      break;
+    }
+
+    const r = await ingestAndDerive(db, args[0]);
     console.log(r.skipped
       ? 'already ingested, nothing to do'
       : `snapshot ${r.snapshotId}: +${r.gained.length} followers, -${r.lost.length}`);
@@ -59,8 +72,9 @@ switch (cmd) {
     if (!dir) { console.error('usage: watch <folder>'); process.exit(1); }
     const db = openDb(DB_PATH);
     console.log(`watching ${dir} for exports…`);
-    await watchFolder(db, dir, ({ zipPath, lost }) => {
+    await watchFolder(db, dir, ({ zipPath, lost, captured }) => {
       console.log(`ingested ${zipPath}`);
+      if (captured !== undefined) console.log(`  ${captured} inbound row(s) captured`);
       if (lost.length) console.log(`  ${lost.length} unfollower(s): ${lost.join(', ')}`);
     });
     break;
@@ -68,6 +82,6 @@ switch (cmd) {
 
   default:
     console.error(`unknown command: ${cmd ?? '(none)'}`);
-    console.error('commands: inventory <zip> | ingest <zip> | report [unfollowers|lurkers] | serve | watch <dir>');
+    console.error('commands: inventory <zip> | ingest <zip|capture.json> | report [unfollowers|lurkers] | serve | watch <dir>');
     process.exit(1);
 }
