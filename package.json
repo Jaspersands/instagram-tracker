@@ -12,7 +12,8 @@
     "ingest": "tsx src/cli/index.ts ingest",
     "report": "tsx src/cli/index.ts report",
     "watch": "tsx src/cli/index.ts watch",
-    "serve": "tsx src/cli/index.ts serve"
+    "serve": "tsx src/cli/index.ts serve",
+    "status": "tsx src/cli/index.ts status"
   },
   "keywords": [],
   "author": "",
