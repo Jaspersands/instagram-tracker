@@ -1,9 +1,10 @@
 import { createHash } from 'node:crypto';
-import { createReadStream, statSync } from 'node:fs';
+import { createReadStream, statSync, readFileSync } from 'node:fs';
 import { basename } from 'node:path';
 import type { Db } from '../db/open.js';
 import { parseArchive } from '../parse/parseArchive.js';
-import { createDbSink } from './dbSink.js';
+import { createDbSink, accountId } from './dbSink.js';
+import { parseCapture, CAPTURE_KIND_MAP } from '../parse/capture.js';
 
 export async function hashFile(path: string): Promise<string> {
   const hash = createHash('sha256');
@@ -52,4 +53,48 @@ export async function ingestArchive(
     .run(JSON.stringify(sink.files), snapshotId);
 
   return { snapshotId, skipped: false };
+}
+
+/**
+ * Ingest a bookmarklet capture. The DOM carries no per-like timestamp, so the
+ * dedupe key is kind|username|permalink: re-capturing one post is a no-op, but
+ * the same person liking two different posts counts twice.
+ */
+export async function ingestCapture(
+  db: Db,
+  filePath: string,
+): Promise<{ captureId: number; rows: number; skipped: boolean }> {
+  let parsed = null;
+  try {
+    parsed = parseCapture(JSON.parse(readFileSync(filePath, 'utf8')));
+  } catch {
+    parsed = null;
+  }
+  if (!parsed) return { captureId: -1, rows: 0, skipped: true };
+
+  const captureId = Number(
+    db.prepare(
+      `INSERT INTO inbound_capture (captured_at, kind, permalink, raw_json)
+       VALUES (?, ?, ?, ?)`,
+    ).run(parsed.capturedAt, parsed.kind, parsed.permalink,
+          readFileSync(filePath, 'utf8')).lastInsertRowid,
+  );
+
+  const kind = CAPTURE_KIND_MAP[parsed.kind];
+  const ins = db.prepare(
+    `INSERT OR IGNORE INTO interaction
+       (account_id, kind, direction, occurred_at, permalink, text, dedupe_key)
+     VALUES (?, ?, 'in', ?, ?, ?, ?)`);
+
+  let rows = 0;
+  db.transaction(() => {
+    for (const it of parsed!.items) {
+      const r = ins.run(accountId(db, it.username), kind, parsed!.capturedAt,
+        parsed!.permalink, it.text,
+        `${kind}|${it.username}|${parsed!.permalink ?? ''}`);
+      rows += r.changes;
+    }
+  })();
+
+  return { captureId, rows, skipped: false };
 }

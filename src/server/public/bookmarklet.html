@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capture bookmarklet</title>
+<style>
+:root { color-scheme:light; --plane:#f9f9f7; --surface:#fcfcfb; --ink:#0b0b0b;
+  --ink-2:#52514e; --muted:#898781; --border:rgba(11,11,11,.10); --s1:#2a78d6; }
+@media (prefers-color-scheme:dark){ :root:not([data-theme=light]){ color-scheme:dark;
+  --plane:#0d0d0d; --surface:#1a1a19; --ink:#fff; --ink-2:#c3c2b7;
+  --border:rgba(255,255,255,.10); --s1:#3987e5; } }
+body { margin:0; background:var(--plane); color:var(--ink);
+  font:15px/1.6 system-ui,-apple-system,"Segoe UI",sans-serif; }
+main { max-width:660px; margin:0 auto; padding:36px 24px 80px; }
+h1 { font-size:22px; margin:0 0 6px; letter-spacing:-.01em; }
+h2 { font-size:15px; margin:28px 0 8px; }
+p, li { color:var(--ink-2); }
+.drag { display:block; background:var(--surface); border:2px dashed var(--s1);
+  border-radius:12px; padding:20px; text-align:center; margin:22px 0; }
+.drag a { display:inline-block; background:var(--s1); color:#fff; text-decoration:none;
+  padding:10px 20px; border-radius:9px; font-weight:600; cursor:grab; }
+.drag small { display:block; color:var(--muted); margin-top:10px; font-size:13px; }
+.card { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+  padding:14px 18px; margin:16px 0; }
+code { background:var(--plane); border:1px solid var(--border); padding:1px 5px;
+  border-radius:5px; font-size:13px; }
+ol { padding-left:20px; } li { margin:5px 0; }
+a.back { color:var(--s1); }
+</style></head>
+<body><main>
+<h1>Capture bookmarklet</h1>
+<p>Instagram's export contains everything <em>you</em> did, but nothing about who
+engaged with <em>you</em> — that data lives in other people's exports. This captures it
+from lists you open yourself.</p>
+
+<div class="drag">
+  <a href="__BOOKMARKLET__" onclick="alert('Drag this to your bookmarks bar instead of clicking it here.');return false;">📥 IG Capture</a>
+  <small>Drag this button to your bookmarks bar</small>
+</div>
+
+<h2>Using it</h2>
+<ol>
+  <li>Open one of your own posts on instagram.com and click its <strong>likes</strong> count (or the comments, or your story's viewer list).</li>
+  <li><strong>Scroll that list to the bottom yourself.</strong> The panel counts names as they appear.</li>
+  <li>Check the type selector is right, then hit <strong>Save capture</strong>.</li>
+  <li>The file lands in your downloads. If <code>npm run watch</code> is pointed at that folder it ingests on its own; otherwise move it into your watched folder.</li>
+</ol>
+
+<div class="card">
+  <h2 style="margin-top:0">Why this is safe</h2>
+  <p style="margin-bottom:0">It makes <strong>zero network requests</strong> and <strong>never scrolls for you</strong>.
+  It reads text your browser has already drawn because you scrolled. Instagram cannot
+  distinguish it from you looking at the page, because that is all that happens. Tools
+  that log in and enumerate lists in the background are a different thing entirely, and
+  they are what gets accounts disabled.</p>
+</div>
+
+<h2>Limits worth knowing</h2>
+<ul>
+  <li>Comment text is best-effort — it is scraped from the rendered row and can pick up stray interface words.</li>
+  <li>Story viewers are only visible for 24 hours, so those have to be captured in the window.</li>
+  <li>Re-capturing the same post is harmless: rows are keyed on person + post, so nothing duplicates.</li>
+</ul>
+
+<p><a class="back" href="/">← back to the dashboard</a></p>
+</main></body></html>
