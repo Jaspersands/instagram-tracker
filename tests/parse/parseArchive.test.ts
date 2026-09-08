@@ -36,7 +36,7 @@ describe('parseArchive', () => {
     expect(sink.followEdges).toContainEqual({ username: 'bob', direction: 'i_follow', since: 150 });
     expect(sink.interactions).toContainEqual({
       username: 'bob', kind: 'like_post', direction: 'out',
-      occurredAt: 300, permalink: 'https://ig/p/1/',
+      occurredAt: 300, permalink: 'https://ig/p/1/', text: null,
     });
     expect(sink.impressions).toContainEqual({ username: 'carol', kind: 'post_viewed', occurredAt: 400 });
   });
