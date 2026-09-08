@@ -3,6 +3,7 @@ import { openDb } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { unfollowers, lurkGap } from '../report/reports.js';
 import { watchFolder } from '../watch/watcher.js';
+import { buildServer } from '../server/server.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 const [cmd, ...args] = process.argv.slice(2);
@@ -44,6 +45,15 @@ switch (cmd) {
     break;
   }
 
+  case 'serve': {
+    const port = Number(process.env.PORT ?? 4317);
+    const app = buildServer(openDb(DB_PATH));
+    // Loopback only: this serves your DM history and full social graph.
+    await app.listen({ port, host: '127.0.0.1' });
+    console.log(`dashboard on http://127.0.0.1:${port}`);
+    break;
+  }
+
   case 'watch': {
     const dir = args[0];
     if (!dir) { console.error('usage: watch <folder>'); process.exit(1); }
@@ -58,6 +68,6 @@ switch (cmd) {
 
   default:
     console.error(`unknown command: ${cmd ?? '(none)'}`);
-    console.error('commands: inventory <zip> | ingest <zip> | report [unfollowers|lurkers] | watch <dir>');
+    console.error('commands: inventory <zip> | ingest <zip> | report [unfollowers|lurkers] | serve | watch <dir>');
     process.exit(1);
 }
