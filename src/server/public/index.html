@@ -1,2 +1,573 @@
-<!doctype html><html><head><meta charset="utf-8"><title>Instagram Tracker</title></head>
-<body><p>Dashboard placeholder.</p></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Instagram Tracker</title>
+<style>
+:root {
+  color-scheme: light;
+  --plane:#f9f9f7; --surface:#fcfcfb;
+  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
+  --s1:#2a78d6; --s2:#eb6834;
+  --good:#006300; --crit:#d03b3b;
+  --cell0:#f2f1ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --plane:#0d0d0d; --surface:#1a1a19;
+    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
+    --s1:#3987e5; --s2:#d95926;
+    --good:#0ca30c; --crit:#d03b3b;
+    --cell0:#232322;
+  }
+}
+* { box-sizing: border-box; }
+body {
+  margin:0; background:var(--plane); color:var(--ink);
+  font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+header { padding:20px 24px 0; }
+h1 { font-size:19px; margin:0 0 2px; letter-spacing:-0.01em; }
+.sub { color:var(--muted); font-size:13px; margin:0; }
+nav { display:flex; gap:2px; padding:16px 24px 0; flex-wrap:wrap; border-bottom:1px solid var(--border); }
+nav button {
+  background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-2);
+  padding:8px 12px; font:inherit; cursor:pointer; border-radius:6px 6px 0 0;
+}
+nav button:hover { background:var(--surface); color:var(--ink); }
+nav button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--s1); font-weight:600; }
+main { padding:20px 24px 60px; }
+section[hidden] { display:none; }
+.card {
+  background:var(--surface); border:1px solid var(--border);
+  border-radius:10px; padding:16px; margin-bottom:16px;
+}
+.card h2 { font-size:14px; margin:0 0 2px; }
+.card p.note { color:var(--muted); font-size:12px; margin:0 0 14px; }
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px; }
+.tile { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
+.tile .v { font-size:24px; font-weight:600; letter-spacing:-0.02em; }
+.tile .k { color:var(--muted); font-size:12px; margin-top:1px; }
+.toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+input[type=search], select {
+  background:var(--surface); color:var(--ink); border:1px solid var(--border);
+  border-radius:7px; padding:6px 10px; font:inherit; min-width:180px;
+}
+.scroll { overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th, td { padding:7px 10px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--grid); }
+th {
+  position:sticky; top:0; background:var(--surface); cursor:pointer;
+  color:var(--ink-2); font-weight:600; font-size:12px; user-select:none;
+}
+th:hover { color:var(--ink); }
+th.sorted::after { content:" ↓"; color:var(--s1); }
+th.sorted.asc::after { content:" ↑"; }
+td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
+tbody tr:hover { background:var(--plane); }
+tbody tr.click { cursor:pointer; }
+.yes { color:var(--good); font-weight:600; }
+.no  { color:var(--muted); }
+.empty { color:var(--muted); padding:28px; text-align:center; }
+.pill { display:inline-block; padding:1px 7px; border-radius:99px; background:var(--plane); border:1px solid var(--border); font-size:12px; margin:0 4px 4px 0; }
+#tip {
+  position:fixed; pointer-events:none; opacity:0; transition:opacity .08s;
+  background:var(--ink); color:var(--surface); padding:6px 9px; border-radius:6px;
+  font-size:12px; z-index:9; max-width:260px;
+}
+#drawer {
+  position:fixed; inset:0 0 0 auto; width:min(460px,100%); background:var(--surface);
+  border-left:1px solid var(--border); padding:20px; overflow:auto; z-index:10;
+  box-shadow:-8px 0 32px rgba(0,0,0,.14);
+}
+#drawer[hidden] { display:none; }
+#drawer h3 { margin:0 0 12px; font-size:16px; }
+#drawer button.x { position:absolute; top:14px; right:16px; background:none; border:0; color:var(--muted); font-size:20px; cursor:pointer; }
+.ev { border-bottom:1px solid var(--grid); padding:7px 0; font-size:13px; }
+.ev .m { color:var(--muted); font-size:12px; }
+.legend { display:flex; gap:14px; font-size:12px; color:var(--ink-2); margin-bottom:6px; }
+.legend i { display:inline-block; width:10px; height:2px; vertical-align:middle; margin-right:5px; }
+svg { display:block; max-width:100%; }
+.gridline { stroke:var(--grid); stroke-width:1; }
+.axis { stroke:var(--axis); stroke-width:1; }
+.tick { fill:var(--muted); font-size:10px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Instagram Tracker</h1>
+  <p class="sub" id="sub">loading…</p>
+</header>
+
+<nav id="tabs"></nav>
+
+<main>
+  <section id="tab-overview">
+    <div class="tiles" id="tiles"></div>
+    <div class="card">
+      <h2>Follower count over time</h2>
+      <p class="note">One point per export. Two exports are needed before a trend exists.</p>
+      <div class="legend">
+        <span><i style="background:var(--s1)"></i>Followers</span>
+        <span><i style="background:var(--s2)"></i>Following</span>
+      </div>
+      <div id="trend"></div>
+    </div>
+  </section>
+
+  <section id="tab-people" hidden>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="filter by username…">
+      <select id="pfilter">
+        <option value="all">everyone</option>
+        <option value="mutual">mutuals</option>
+        <option value="notback">they don't follow me back</option>
+        <option value="idontback">I don't follow them back</option>
+        <option value="ghost">no interaction either way</option>
+      </select>
+      <span class="sub" id="pcount"></span>
+    </div>
+    <div class="scroll"><table id="people"></table></div>
+  </section>
+
+  <section id="tab-unfollowers" hidden>
+    <div class="card"><h2>Unfollowers</h2>
+      <p class="note">Detected by diffing consecutive exports. Resolution is however often you export.</p></div>
+    <div class="scroll"><table id="unf"></table></div>
+  </section>
+
+  <section id="tab-lurk" hidden>
+    <div class="card"><h2>Lurk gap</h2>
+      <p class="note">Accounts whose posts you see constantly and never engage with.</p></div>
+    <div class="scroll"><table id="lurk"></table></div>
+  </section>
+
+  <section id="tab-decay" hidden>
+    <div class="card"><h2>Going quiet</h2>
+      <p class="note">Mutual follows with no interaction in the selected window.</p>
+      <div class="toolbar">
+        <select id="decaydays">
+          <option value="30">30 days</option>
+          <option value="90" selected>90 days</option>
+          <option value="180">180 days</option>
+          <option value="365">a year</option>
+        </select>
+      </div>
+    </div>
+    <div class="scroll"><table id="decay"></table></div>
+  </section>
+
+  <section id="tab-habits" hidden>
+    <div class="card">
+      <h2>When you're active</h2>
+      <p class="note">Every recorded interaction, by local weekday and hour. Darker means more.</p>
+      <div id="heat"></div>
+    </div>
+    <div class="card">
+      <h2>Interaction volume by month</h2>
+      <p class="note">Are you using Instagram more or less over time?</p>
+      <div id="months"></div>
+    </div>
+  </section>
+
+  <section id="tab-taste" hidden>
+    <div class="card"><h2>What Instagram thinks you're into</h2>
+      <p class="note">Instagram's own inferred model of you, taken from your export.</p>
+      <div id="topics"></div></div>
+    <div class="card"><h2>Hashtags you follow</h2><div id="hashtags"></div></div>
+    <div class="card"><h2>Recent searches</h2><div id="searches"></div></div>
+    <div class="card"><h2>Whose posts you save</h2><div class="scroll"><table id="saved"></table></div></div>
+  </section>
+</main>
+
+<div id="tip"></div>
+<div id="drawer" hidden><button class="x" id="closed">&times;</button><div id="drawerbody"></div></div>
+
+<script>
+const TABS = [
+  ['overview','Overview'], ['people','People'], ['unfollowers','Unfollowers'],
+  ['lurk','Lurk gap'], ['decay','Going quiet'], ['habits','Habits'], ['taste','Taste'],
+];
+const $ = (s) => document.querySelector(s);
+const el = (t, a = {}, kids = []) => {
+  const n = document.createElement(t);
+  for (const [k, v] of Object.entries(a)) {
+    if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v;
+    else n.setAttribute(k, v);
+  }
+  for (const c of [].concat(kids)) n.append(c);
+  return n;
+};
+const svg = (t, a = {}) => {
+  const n = document.createElementNS('http://www.w3.org/2000/svg', t);
+  for (const [k, v] of Object.entries(a)) n.setAttribute(k, v);
+  return n;
+};
+const get = (u) => fetch(u).then((r) => r.json());
+const fmtDate = (t) => t == null ? '—' : new Date(t * 1000).toISOString().slice(0, 10);
+const ago = (t) => {
+  if (t == null) return 'never';
+  const d = Math.round((Date.now() / 1000 - t) / 86400);
+  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 365 ? d + 'd ago' : (d / 365).toFixed(1) + 'y ago';
+};
+const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
+
+// Sequential blue ramp. On a dark surface the order flips so that near-zero
+// recedes toward the surface instead of glowing.
+const RAMP = ['#cde2fb','#b7d3f6','#9ec5f4','#86b6ef','#6da7ec','#5598e7','#3987e5',
+              '#2a78d6','#256abf','#1c5cab','#184f95','#104281','#0d366b'];
+const ramp = (f) => {
+  const arr = isDark() ? [...RAMP].reverse() : RAMP;
+  return arr[Math.min(arr.length - 1, Math.max(0, Math.round(f * (arr.length - 1))))];
+};
+
+// ---------- tooltip ----------
+const tip = $('#tip');
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.opacity = 1;
+  const r = tip.getBoundingClientRect();
+  tip.style.left = Math.min(innerWidth - r.width - 8, e.clientX + 12) + 'px';
+  tip.style.top = Math.max(8, e.clientY - r.height - 10) + 'px';
+}
+const hideTip = () => { tip.style.opacity = 0; };
+function hoverable(node, html) {
+  node.addEventListener('mousemove', (e) => showTip(e, html));
+  node.addEventListener('mouseleave', hideTip);
+}
+
+// ---------- generic sortable table ----------
+function table(mount, cols, rows, opts = {}) {
+  const t = typeof mount === 'string' ? $(mount) : mount;
+  t.innerHTML = '';
+  if (!rows.length) {
+    t.append(el('tbody', {}, el('tr', {}, el('td', { class: 'empty', colspan: cols.length,
+      text: opts.empty || 'Nothing here yet.' }))));
+    return;
+  }
+  let sortKey = opts.sort || cols[0].k, asc = !!opts.asc;
+  const thead = el('thead'), tr = el('tr');
+  cols.forEach((c) => {
+    const th = el('th', { class: c.num ? 'num' : '', text: c.t });
+    if (c.title) th.title = c.title;
+    th.onclick = () => { if (sortKey === c.k) asc = !asc; else { sortKey = c.k; asc = !!c.asc; } draw(); };
+    tr.append(th);
+  });
+  thead.append(tr); t.append(thead);
+  const tbody = el('tbody'); t.append(tbody);
+
+  function draw() {
+    [...thead.querySelectorAll('th')].forEach((th, i) => {
+      th.className = (cols[i].num ? 'num ' : '') + (cols[i].k === sortKey ? 'sorted' + (asc ? ' asc' : '') : '');
+    });
+    const sorted = [...rows].sort((a, b) => {
+      const x = a[sortKey], y = b[sortKey];
+      if (x == null && y == null) return 0;
+      if (x == null) return 1;
+      if (y == null) return -1;
+      const c = typeof x === 'string' ? x.localeCompare(y) : (x === y ? 0 : x < y ? -1 : 1);
+      return asc ? c : -c;
+    });
+    tbody.innerHTML = '';
+    for (const r of sorted) {
+      const row = el('tr', opts.onRow ? { class: 'click' } : {});
+      for (const c of cols) {
+        const td = el('td', { class: c.num ? 'num' : '' });
+        const v = c.render ? c.render(r) : r[c.k];
+        if (v instanceof Node) td.append(v); else td.textContent = v ?? '—';
+        row.append(td);
+      }
+      if (opts.onRow) row.onclick = () => opts.onRow(r);
+      tbody.append(row);
+    }
+  }
+  draw();
+}
+const bool = (b) => el('span', { class: b ? 'yes' : 'no', text: b ? 'yes' : '–' });
+
+// ---------- charts ----------
+function lineChart(mount, snaps) {
+  const box = $(mount); box.innerHTML = '';
+  if (!snaps.length) { box.append(el('p', { class: 'empty', text: 'No snapshots yet.' })); return; }
+  if (snaps.length === 1) {
+    const s = snaps[0];
+    box.append(el('p', { class: 'empty',
+      text: `One snapshot so far: ${s.followers} followers, ${s.following} following. Ingest a second export to see a trend.` }));
+    return;
+  }
+  const W = Math.min(880, box.clientWidth || 880), H = 240, P = { t: 12, r: 16, b: 26, l: 44 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const max = Math.max(...snaps.flatMap((s) => [s.followers, s.following])) * 1.1 || 1;
+  const x = (i) => P.l + (snaps.length === 1 ? iw / 2 : (i / (snaps.length - 1)) * iw);
+  const y = (v) => P.t + ih - (v / max) * ih;
+
+  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
+  for (let g = 0; g <= 4; g++) {
+    const yy = P.t + (g / 4) * ih;
+    s.append(svg('line', { x1: P.l, x2: W - P.r, y1: yy, y2: yy, class: 'gridline' }));
+    const lab = svg('text', { x: P.l - 8, y: yy + 3, class: 'tick', 'text-anchor': 'end' });
+    lab.textContent = Math.round(max * (1 - g / 4));
+    s.append(lab);
+  }
+  s.append(svg('line', { x1: P.l, x2: W - P.r, y1: P.t + ih, y2: P.t + ih, class: 'axis' }));
+
+  for (const [key, color] of [['followers', 'var(--s1)'], ['following', 'var(--s2)']]) {
+    const d = snaps.map((sn, i) => `${i ? 'L' : 'M'}${x(i)},${y(sn[key])}`).join(' ');
+    s.append(svg('path', { d, fill: 'none', stroke: color, 'stroke-width': 2,
+      'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
+    snaps.forEach((sn, i) => {
+      // 2px surface ring keeps overlapping markers separable
+      const c = svg('circle', { cx: x(i), cy: y(sn[key]), r: 4.5, fill: color,
+        stroke: 'var(--surface)', 'stroke-width': 2 });
+      hoverable(c, `<b>${sn[key]}</b> ${key}<br>${fmtDate(sn.takenAt)}`);
+      s.append(c);
+    });
+    // direct label on the last point
+    const last = snaps[snaps.length - 1];
+    const lab = svg('text', { x: x(snaps.length - 1) - 6, y: y(last[key]) - 10,
+      class: 'tick', 'text-anchor': 'end', fill: 'var(--ink-2)' });
+    lab.textContent = key;
+    s.append(lab);
+  }
+  snaps.forEach((sn, i) => {
+    if (snaps.length > 8 && i % Math.ceil(snaps.length / 8)) return;
+    const t = svg('text', { x: x(i), y: H - 8, class: 'tick', 'text-anchor': 'middle' });
+    t.textContent = fmtDate(sn.takenAt).slice(5);
+    s.append(t);
+  });
+  box.append(s);
+}
+
+function heatmap(mount, grid) {
+  const box = $(mount); box.innerHTML = '';
+  const max = Math.max(...grid.flat());
+  if (!max) { box.append(el('p', { class: 'empty', text: 'No timestamped interactions yet.' })); return; }
+  const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const cell = 24, gap = 2, L = 34, T = 16;
+  const W = L + 24 * (cell + gap), H = T + 7 * (cell + gap) + 6;
+  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
+
+  for (let h = 0; h < 24; h += 3) {
+    const t = svg('text', { x: L + h * (cell + gap) + cell / 2, y: 10, class: 'tick', 'text-anchor': 'middle' });
+    t.textContent = h;
+    s.append(t);
+  }
+  grid.forEach((row, d) => {
+    const t = svg('text', { x: L - 7, y: T + d * (cell + gap) + cell / 2 + 4, class: 'tick', 'text-anchor': 'end' });
+    t.textContent = DAYS[d];
+    s.append(t);
+    row.forEach((n, h) => {
+      const r = svg('rect', {
+        x: L + h * (cell + gap), y: T + d * (cell + gap),
+        width: cell, height: cell, rx: 3,
+        fill: n === 0 ? 'var(--cell0)' : ramp(n / max),
+      });
+      hoverable(r, `<b>${n}</b> interaction${n === 1 ? '' : 's'}<br>${DAYS[d]} ${h}:00–${h + 1}:00`);
+      s.append(r);
+    });
+  });
+  box.append(s);
+}
+
+function barChart(mount, data) {
+  const box = $(mount); box.innerHTML = '';
+  if (!data.length) { box.append(el('p', { class: 'empty', text: 'No data yet.' })); return; }
+  const W = Math.min(880, box.clientWidth || 880), H = 200, P = { t: 10, r: 12, b: 28, l: 44 };
+  const iw = W - P.l - P.r, ih = H - P.t - P.b;
+  const max = Math.max(...data.map((d) => d.n)) * 1.1 || 1;
+  const bw = Math.max(3, Math.min(56, iw / data.length - 2));
+  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
+
+  for (let g = 0; g <= 3; g++) {
+    const yy = P.t + (g / 3) * ih;
+    s.append(svg('line', { x1: P.l, x2: W - P.r, y1: yy, y2: yy, class: 'gridline' }));
+    const lab = svg('text', { x: P.l - 8, y: yy + 3, class: 'tick', 'text-anchor': 'end' });
+    lab.textContent = Math.round(max * (1 - g / 3));
+    s.append(lab);
+  }
+  data.forEach((d, i) => {
+    const h = (d.n / max) * ih;
+    const r = svg('rect', {
+      x: P.l + i * (iw / data.length), y: P.t + ih - h,
+      width: bw, height: Math.max(1, h), rx: 4, fill: 'var(--s1)',
+    });
+    hoverable(r, `<b>${d.n}</b> interactions<br>${d.month}`);
+    s.append(r);
+    if (data.length <= 14 || i % Math.ceil(data.length / 12) === 0) {
+      const t = svg('text', { x: P.l + i * (iw / data.length) + bw / 2, y: H - 10,
+        class: 'tick', 'text-anchor': 'middle' });
+      t.textContent = d.month.slice(2);
+      s.append(t);
+    }
+  });
+  s.append(svg('line', { x1: P.l, x2: W - P.r, y1: P.t + ih, y2: P.t + ih, class: 'axis' }));
+  box.append(s);
+}
+
+// ---------- drawer ----------
+async function openPerson(username) {
+  const d = await get('/api/person/' + encodeURIComponent(username));
+  const b = $('#drawerbody'); b.innerHTML = '';
+  b.append(el('h3', { text: '@' + username }));
+  if (d.row) {
+    const r = d.row;
+    b.append(el('p', { class: 'sub', text:
+      `${r.followsMe ? 'follows you' : 'does not follow you'} · ${r.iFollow ? 'you follow them' : 'you do not follow them'}` +
+      (r.followedSince ? ` · since ${fmtDate(r.followedSince)}` : '') }));
+    const stats = [['likes', r.likes], ['comments', r.comments], ['story likes', r.storyLikes],
+      ['saves', r.saves], ['DMs out', r.dmOut], ['DMs in', r.dmIn], ['posts seen', r.views],
+      ['closeness', relScore(r.score) + '/100']];
+    const wrap = el('div', {}, stats.map(([k, v]) => el('span', { class: 'pill', text: `${k}: ${v}` })));
+    b.append(wrap);
+  }
+  for (const e of d.events) {
+    b.append(el('div', { class: 'ev' }, [
+      el('div', { text: e.kind.replace(/_/g, ' ') }),
+      el('div', { class: 'm', text: fmtDate(e.occurredAt) }),
+    ]));
+  }
+  if (!d.timeline.length) b.append(el('p', { class: 'empty', text: 'No recorded interactions.' }));
+  for (const t of d.timeline.slice(0, 200)) {
+    b.append(el('div', { class: 'ev' }, [
+      el('div', { text: (t.direction === 'out' ? '→ ' : '← ') + t.kind.replace(/_/g, ' ') + (t.text ? ': ' + t.text : '') }),
+      el('div', { class: 'm', text: fmtDate(t.occurredAt) }),
+    ]));
+  }
+  $('#drawer').hidden = false;
+}
+$('#closed').onclick = () => { $('#drawer').hidden = true; };
+addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#drawer').hidden = true; });
+
+// ---------- tabs ----------
+let current = 'overview';
+const nav = $('#tabs');
+TABS.forEach(([id, label]) => {
+  const b = el('button', { text: label, 'aria-selected': id === 'overview' });
+  b.onclick = () => {
+    current = id;
+    [...nav.children].forEach((c, i) => c.setAttribute('aria-selected', TABS[i][0] === id));
+    TABS.forEach(([t]) => { $('#tab-' + t).hidden = t !== id; });
+    if (id === 'overview') lineChart('#trend', STATE.overview.snapshots);
+    if (id === 'habits') { heatmap('#heat', STATE.habits.heatmap); barChart('#months', STATE.habits.byMonth); }
+  };
+  nav.append(b);
+});
+
+// ---------- load ----------
+const STATE = {};
+let allPeople = [];
+
+// The raw decayed score falls below 0.05 for anything older than roughly a
+// year, so every row would print "0.0" and the column would look broken even
+// though the ordering is right. Show each tie relative to the strongest one.
+let maxScore = 0;
+const relScore = (v) => (maxScore <= 0 ? '0' : String(Math.round((v / maxScore) * 100)));
+
+function renderPeople() {
+  maxScore = allPeople.reduce((m, p) => Math.max(m, p.score), 0);
+  const q = $('#q').value.trim().toLowerCase();
+  const f = $('#pfilter').value;
+  const rows = allPeople.filter((p) => {
+    if (q && !p.username.includes(q)) return false;
+    const touched = p.likes + p.comments + p.storyLikes + p.saves + p.dmOut + p.dmIn + p.mentions;
+    if (f === 'mutual') return p.followsMe && p.iFollow;
+    if (f === 'notback') return p.iFollow && !p.followsMe;
+    if (f === 'idontback') return p.followsMe && !p.iFollow;
+    if (f === 'ghost') return touched === 0;
+    return true;
+  });
+  $('#pcount').textContent = `${rows.length} of ${allPeople.length}`;
+  table('#people', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'followsMe', t: 'follows you', render: (r) => bool(r.followsMe) },
+    { k: 'iFollow', t: 'you follow', render: (r) => bool(r.iFollow) },
+    { k: 'followedSince', t: 'since', render: (r) => fmtDate(r.followedSince) },
+    { k: 'likes', t: 'likes', num: true },
+    { k: 'comments', t: 'comments', num: true },
+    { k: 'storyLikes', t: 'story ♥', num: true },
+    { k: 'saves', t: 'saves', num: true },
+    { k: 'dmOut', t: 'DM →', num: true },
+    { k: 'dmIn', t: 'DM ←', num: true },
+    { k: 'views', t: 'posts seen', num: true, title: 'Their posts that appeared in your feed' },
+    { k: 'lastInteraction', t: 'last', render: (r) => ago(r.lastInteraction) },
+    { k: 'score', t: 'closeness', num: true, render: (r) => relScore(r.score),
+      title: 'Relative to your strongest tie (100). Recency-decayed: DM 5, comment 4, save 3, story like 2.5, like 2' },
+  ], rows, { sort: 'score', empty: 'No people yet — ingest an export first.', onRow: (r) => openPerson(r.username) });
+}
+
+async function loadDecay() {
+  const d = await get('/api/decay?days=' + $('#decaydays').value);
+  table('#decay', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'daysSilent', t: 'days silent', num: true },
+    { k: 'lastInteraction', t: 'last interaction', render: (r) => r.lastInteraction ? fmtDate(r.lastInteraction) : 'never' },
+  ], d, { sort: 'daysSilent', empty: 'No quiet mutuals in this window.' });
+}
+
+(async function init() {
+  const [ov, ppl, unf, lurk, hab, tst] = await Promise.all([
+    get('/api/overview'), get('/api/people'), get('/api/unfollowers'),
+    get('/api/lurkers'), get('/api/habits'), get('/api/taste'),
+  ]);
+  Object.assign(STATE, { overview: ov, habits: hab });
+  allPeople = ppl;
+
+  const latest = ov.snapshots[ov.snapshots.length - 1];
+  $('#sub').textContent = ov.snapshots.length === 0
+    ? 'No exports ingested yet — run: npm run ingest -- <archive.zip>'
+    : `${ov.snapshots.length} snapshot${ov.snapshots.length === 1 ? '' : 's'} · last ${fmtDate(latest.takenAt)}`;
+
+  const mutuals = ppl.filter((p) => p.followsMe && p.iFollow).length;
+  const tiles = [
+    ['followers', latest ? latest.followers : 0], ['following', latest ? latest.following : 0],
+    ['mutuals', mutuals], ['unfollowers', ov.lost], ['new followers', ov.gained],
+    ['interactions', ov.totalInteractions],
+  ];
+  $('#tiles').innerHTML = '';
+  for (const [k, v] of tiles) {
+    $('#tiles').append(el('div', { class: 'tile' }, [
+      el('div', { class: 'v', text: v.toLocaleString() }), el('div', { class: 'k', text: k }),
+    ]));
+  }
+
+  lineChart('#trend', ov.snapshots);
+  renderPeople();
+  $('#q').oninput = renderPeople;
+  $('#pfilter').onchange = renderPeople;
+
+  table('#unf', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'detectedAt', t: 'detected', render: (r) => fmtDate(r.detectedAt) },
+    { k: 'followedSince', t: 'had followed since', render: (r) => fmtDate(r.followedSince) },
+    { k: 'daysLasted', t: 'days lasted', num: true },
+    { k: 'myScore', t: 'your engagement', num: true, render: (r) => r.myScore.toFixed(1) },
+    { k: 'iStillFollow', t: 'you still follow', render: (r) => bool(r.iStillFollow) },
+  ], unf, { sort: 'detectedAt', empty: 'None detected. Two exports are needed before this works.' });
+
+  table('#lurk', [
+    { k: 'username', t: 'username', asc: true },
+    { k: 'views', t: 'posts seen', num: true },
+    { k: 'engagements', t: 'times engaged', num: true },
+  ], lurk, { sort: 'views', empty: 'No viewing history in this export.' });
+
+  await loadDecay();
+  $('#decaydays').onchange = loadDecay;
+
+  const chips = (mount, items) => {
+    const m = $(mount); m.innerHTML = '';
+    if (!items.length) { m.append(el('p', { class: 'empty', text: 'Nothing recorded.' })); return; }
+    items.forEach((t) => m.append(el('span', { class: 'pill', text: t })));
+  };
+  chips('#topics', tst.topics.map((t) => t.value));
+  chips('#hashtags', tst.hashtags.map((h) => h.value));
+  chips('#searches', tst.searches.map((s) => s.term));
+  table('#saved', [
+    { k: 'username', t: 'username', asc: true }, { k: 'n', t: 'saved posts', num: true },
+  ], tst.savedAuthors, { sort: 'n', empty: 'No saved posts in this export.' });
+})();
+</script>
+</body>
+</html>

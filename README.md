@@ -54,14 +54,33 @@ Watch a folder and ingest anything that lands in it:
 npm run watch -- ~/Dropbox/Instagram
 ```
 
-Reports:
+Open the dashboard:
+
+```bash
+npm run serve
+```
+
+Then visit **http://127.0.0.1:4317**. It binds to loopback only — it serves your DM
+history and full social graph and must never be reachable from the network.
+
+Tabs: Overview (stat tiles + follower trend) · People (the big sortable table,
+click any row for that person's full timeline) · Unfollowers · Lurk gap · Going
+quiet · Habits (activity heatmap + monthly volume) · Taste.
+
+Or from the terminal:
 
 ```bash
 npm run report              # unfollowers
 npm run report -- lurkers   # accounts you watch constantly and never engage with
 ```
 
-The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`.
+The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`, and
+the dashboard port with `PORT=`.
+
+**Keep the original archive filenames.** Instagram names them
+`instagram-<user>-YYYY-MM-DD-<hash>.zip`, and that date is used to date the
+snapshot — it is far more reliable than the file's modified time, which changes
+whenever the file is copied or synced.
 
 ## What gets tracked
 
@@ -78,6 +97,10 @@ with. No off-the-shelf tracker shows you this.
 
 **Your taste** — Instagram's own inferred interest model of you, followed
 hashtags, search history, your posting cadence.
+
+**Closeness** — one recency-decayed number per person (DM 5, comment 4, save 3,
+story like 2.5, like 2, with a 90-day decay constant), shown relative to your
+strongest tie so the column stays readable no matter how old your data is.
 
 ## What cannot be tracked, and why
 
