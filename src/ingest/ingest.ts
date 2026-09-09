@@ -134,9 +134,10 @@ export async function ingestCapture(
 
   const captureId = Number(
     db.prepare(
-      `INSERT INTO inbound_capture (captured_at, kind, permalink, raw_json)
-       VALUES (?, ?, ?, ?)`,
+      `INSERT INTO inbound_capture (captured_at, kind, permalink, complete, expected, raw_json)
+       VALUES (?, ?, ?, ?, ?, ?)`,
     ).run(parsed.capturedAt, parsed.kind, parsed.permalink,
+          parsed.complete ? 1 : 0, parsed.expected,
           readFileSync(filePath, 'utf8')).lastInsertRowid,
   );
 

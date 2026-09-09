@@ -6,6 +6,14 @@ export interface ParsedCapture {
   permalink: string | null;
   capturedAt: number;
   items: CaptureItem[];
+  /**
+   * Whether the list was scrolled to the end. A partial capture is fine for
+   * recording who *did* engage, but its absences mean nothing — treating them
+   * as evidence would accuse every unseen liker of being a ghost.
+   * Absent in older files, which were all scrolled by hand: assume complete.
+   */
+  complete: boolean;
+  expected: number | null;
 }
 
 /** post_likes -> like_received, etc. These land as interaction.direction = 'in'. */
@@ -49,5 +57,7 @@ export function parseCapture(json: unknown): ParsedCapture | null {
     permalink: typeof c.permalink === 'string' ? c.permalink : null,
     capturedAt: typeof c.capturedAt === 'number' ? c.capturedAt : Math.floor(Date.now() / 1000),
     items,
+    complete: c.complete === undefined ? true : c.complete === true,
+    expected: typeof c.expected === 'number' ? c.expected : null,
   };
 }

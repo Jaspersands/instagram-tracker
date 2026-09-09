@@ -25,6 +25,23 @@
   var CHROME = new Set(('follow following followers requested remove message removed ' +
     'unfollow verified suggested for you new close cancel confirm follow back').split(' '));
 
+  /**
+   * How many people the page says are in this list. Instagram writes
+   * "Liked by someone and 209 others", or a plain count on followers/following.
+   * Without it there is no way to know whether a list was scrolled to the end,
+   * and a half-scrolled capture would make every unseen liker look like a ghost.
+   */
+  function expectedTotal() {
+    var text = document.body.innerText || '';
+    var m = /and\s+([\d,]+)\s+others?/i.exec(text);
+    if (m) return parseInt(m[1].replace(/,/g, ''), 10) + 1;
+    m = /([\d,]+)\s+likes?/i.exec(text);
+    if (m) return parseInt(m[1].replace(/,/g, ''), 10);
+    m = /([\d,]+)\s+followers?/i.exec(text);
+    if (m) return parseInt(m[1].replace(/,/g, ''), 10);
+    return null;
+  }
+
   function guessKind() {
     var p = location.pathname;
     if (/\/stories\//.test(p)) return 'story_viewers';
@@ -117,6 +134,8 @@
     '<div id="igt-n" style="font-size:22px;font-weight:600;letter-spacing:-.02em">0</div>' +
     '<div style="color:#c3c2b7;font-size:12px;margin-bottom:9px">usernames captured</div>' +
     '<div id="igt-names" style="color:#898781;font-size:11px;margin:-6px 0 9px">0 with display names</div>' +
+    '<div id="igt-prog" style="height:4px;border-radius:99px;background:#333;margin-bottom:9px;overflow:hidden">' +
+      '<div id="igt-bar" style="height:100%;width:0%;background:#3987e5"></div></div>' +
     '<select id="igt-k" style="width:100%;margin-bottom:8px;padding:5px;border-radius:7px;' +
       'background:#0d0d0d;color:#fff;border:1px solid rgba(255,255,255,.2);font:inherit">' +
       '<option value="post_likes">Likes on my post</option>' +
@@ -135,14 +154,31 @@
   var nEl = box.querySelector('#igt-n');
   var kEl = box.querySelector('#igt-k');
   kEl.value = kind;
-  kEl.addEventListener('change', function () { kind = kEl.value; found.clear(); scan(); });
+  kEl.addEventListener('change', function () {
+    kind = kEl.value; found.clear(); expected = expectedTotal(); scan();
+  });
 
   var namesEl = box.querySelector('#igt-names');
+  var barEl = box.querySelector('#igt-bar');
+  var expected = expectedTotal();
+
+  function isComplete() {
+    // Allow a small shortfall: the count on the page lags, and blocked or
+    // deleted accounts never render a row.
+    return expected === null ? true : found.size >= Math.floor(expected * 0.97);
+  }
+
   function render() {
-    nEl.textContent = String(found.size);
+    nEl.textContent = expected ? found.size + ' / ~' + expected : String(found.size);
     var withNames = 0;
     found.forEach(function (v) { if (v.name) withNames++; });
-    namesEl.textContent = withNames + ' with display names';
+    namesEl.textContent = withNames + ' with display names' +
+      (expected && !isComplete() ? ' · keep scrolling' : expected ? ' · complete' : '');
+    if (barEl) {
+      barEl.style.width = expected
+        ? Math.min(100, Math.round((found.size / expected) * 100)) + '%' : '100%';
+      barEl.style.background = isComplete() ? '#1baf7a' : '#3987e5';
+    }
   }
 
   box.querySelector('#igt-save').addEventListener('click', function () {
@@ -152,7 +188,10 @@
     });
     var payload = {
       v: 1, kind: kind, permalink: location.href.split('?')[0],
-      capturedAt: Math.floor(Date.now() / 1000), items: items,
+      capturedAt: Math.floor(Date.now() / 1000),
+      expected: expected,
+      complete: isComplete(),
+      items: items,
     };
     var blob = new Blob([JSON.stringify(payload, null, 1)], { type: 'application/json' });
     var url = URL.createObjectURL(blob);
@@ -163,7 +202,7 @@
     a.click();
     a.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
-    nEl.textContent = found.size + ' ✓';
+    nEl.textContent = found.size + (isComplete() ? ' ✓' : ' ✓ (partial)');
   });
 
   box.querySelector('#igt-close').addEventListener('click', function () {

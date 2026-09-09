@@ -16,6 +16,10 @@ export type Db = Database.Database;
 const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
   { table: 'account', column: 'display_name', ddl: 'ALTER TABLE account ADD COLUMN display_name TEXT' },
   { table: 'snapshot', column: 'owner', ddl: 'ALTER TABLE snapshot ADD COLUMN owner TEXT' },
+  { table: 'inbound_capture', column: 'complete',
+    ddl: 'ALTER TABLE inbound_capture ADD COLUMN complete INTEGER NOT NULL DEFAULT 1' },
+  { table: 'inbound_capture', column: 'expected',
+    ddl: 'ALTER TABLE inbound_capture ADD COLUMN expected INTEGER' },
 ];
 
 function migrate(db: Db): void {

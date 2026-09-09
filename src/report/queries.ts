@@ -257,9 +257,16 @@ export function inbound(db: Db, now: number) {
     return { captures: [], ghosts: [], superfans: [], reciprocity: [] };
   }
 
+  // The same reasoning applies to a list that was not scrolled to the end: its
+  // absences carry no information, so ghost detection needs at least one
+  // complete capture before it can claim anyone never engaged.
+  const completeCaptures = (db.prepare(
+    'SELECT COUNT(*) AS c FROM inbound_capture WHERE complete = 1',
+  ).get() as { c: number }).c;
+
   const latest = latestSnapshotId(db);
 
-  const ghosts = latest === null ? [] : (db.prepare(
+  const ghosts = (latest === null || completeCaptures === 0) ? [] : (db.prepare(
     `SELECT a.username AS username, f.since AS followedSince
        FROM account a
        JOIN follow_edge f ON f.account_id = a.id
