@@ -16,6 +16,17 @@ export function isCaptureName(name: string): boolean {
   return /^ig-capture-.*\.json$/i.test(name);
 }
 
+/**
+ * An explicit override, colon- or comma-separated. Set IG_WATCH_DIRS when your
+ * exports land somewhere unusual, or to narrow the scan to one folder.
+ */
+export function configuredDirs(env: NodeJS.ProcessEnv = process.env): string[] | null {
+  const raw = env.IG_WATCH_DIRS;
+  if (!raw || !raw.trim()) return null;
+  const dirs = raw.split(/[:,]/).map((d) => d.trim()).filter(Boolean);
+  return dirs.length ? dirs : null;
+}
+
 /** Where a download or a scheduled cloud transfer plausibly lands. */
 function isDirectory(p: string): boolean {
   try { return statSync(p).isDirectory(); } catch { return false; }
@@ -26,6 +37,9 @@ export function candidateDirs(
   isDir: (p: string) => boolean = isDirectory,
   cloudStorageEntries?: string[],
 ): string[] {
+  const override = configuredDirs();
+  if (override) return override;
+
   const out: string[] = [];
   // Must be a directory, not merely present: ~/Library/CloudStorage contains a
   // .DS_Store file that would otherwise be handed to the watcher as a folder.

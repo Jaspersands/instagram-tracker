@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { isExportArchive, isCaptureName, candidateDirs, newestFirst } from '../../src/auto/discover.js';
+import { isExportArchive, isCaptureName, candidateDirs, newestFirst, configuredDirs } from '../../src/auto/discover.js';
 
 describe('isExportArchive', () => {
   it('recognises the names Instagram and Meta actually use', () => {
@@ -47,6 +47,17 @@ describe('candidateDirs', () => {
   it('never returns duplicates', () => {
     const dirs = candidateDirs('/home/j', () => true, []);
     expect(new Set(dirs).size).toBe(dirs.length);
+  });
+});
+
+describe('configuredDirs', () => {
+  it('splits on colons and commas', () => {
+    expect(configuredDirs({ IG_WATCH_DIRS: '/a:/b' })).toEqual(['/a', '/b']);
+    expect(configuredDirs({ IG_WATCH_DIRS: '/a, /b' })).toEqual(['/a', '/b']);
+  });
+  it('returns null when unset or blank, so the defaults apply', () => {
+    expect(configuredDirs({})).toBeNull();
+    expect(configuredDirs({ IG_WATCH_DIRS: '   ' })).toBeNull();
   });
 });
 

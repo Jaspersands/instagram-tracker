@@ -42,22 +42,38 @@ tapping whenever you want fresh data. The agent still does everything after that
 
 ```bash
 npm install
-npm run install-agent
+npm run serve
 ```
 
-That is the whole setup. The agent runs at login, watches everywhere an export or
-capture plausibly lands (Downloads, Dropbox, Google Drive, iCloud Drive), ingests
-anything that appears, and sends a notification naming whoever unfollowed you. You
-never type a command again.
+Open **http://127.0.0.1:4317** and press **Pull new data**.
 
-If you would rather not run a background service:
+That button is the whole workflow. It scans Downloads, Dropbox, Google Drive and
+iCloud Drive, ingests any export or bookmarklet capture it finds, and refreshes
+the page. Exports go in oldest-first so the snapshot diffs run in order, unrelated
+zips are ignored, and pressing it again when nothing is new just says "up to
+date" — it is safe to mash.
+
+Set `IG_WATCH_DIRS` to scan somewhere else:
 
 ```bash
-npm run auto      # find and ingest everything, then print status
+IG_WATCH_DIRS=~/Dropbox/Instagram npm run serve
 ```
 
-`auto` scans the same folders, ingests exports oldest-first so the diffs are in
-order, picks up bookmarklet captures, and ignores unrelated zips.
+### If you would rather not open the page
+
+```bash
+npm run auto      # same scan and ingest, from the terminal
+```
+
+### If you want it to happen without asking at all
+
+```bash
+npm run install-agent     # macOS LaunchAgent: watches at login, restarts if it dies
+npm run agent-status
+npm run uninstall-agent
+```
+
+Optional. The button covers the same ground on demand.
 
 ### The rest of the commands
 
@@ -75,18 +91,10 @@ Ingest one archive (idempotent — re-ingesting the same file is a no-op):
 npm run ingest -- ~/Downloads/instagram-export.zip
 ```
 
-Watch folders in the foreground instead of via the agent (no argument watches all
-the usual places):
+Watch folders in the foreground (no argument watches all the usual places):
 
 ```bash
 npm run watch
-```
-
-Manage the background agent:
-
-```bash
-npm run agent-status
-npm run uninstall-agent
 ```
 
 Check where things stand — snapshot count, how stale your last export is, and

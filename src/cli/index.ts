@@ -8,7 +8,8 @@ import { watchFolder } from '../watch/watcher.js';
 import { buildServer } from '../server/server.js';
 import { status, formatStatus } from '../report/status.js';
 import { notify, unfollowerMessage } from '../notify/notify.js';
-import { findInputs, candidateDirs } from '../auto/discover.js';
+import { candidateDirs, findInputs } from '../auto/discover.js';
+import { refreshAll } from '../auto/refresh.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 
@@ -82,32 +83,29 @@ switch (cmd) {
   }
 
   case 'auto': {
-    // One command: find everything, ingest whatever is new, say where things stand.
     const db = openDb(DB_PATH);
     const dirs = args.length ? args : candidateDirs();
     console.log(`scanning: ${dirs.join(', ')}`);
-    const { archives, captures } = findInputs(dirs);
 
-    if (!archives.length && !captures.length) {
+    const r = await refreshAll(db, dirs);
+    if (r.found === 0) {
       console.log('\nNothing found yet. Request an export from the Instagram app —');
       console.log('Settings > Accounts Center > Your information and permissions >');
       console.log('Download your information > All available information, JSON, All time.');
       break;
     }
 
-    // Oldest first, so snapshots are diffed in the order they were taken.
-    for (const a of [...archives].reverse()) {
-      const r = await ingestAndDerive(db, a.path);
-      console.log(r.skipped
-        ? `  = ${a.path.split('/').pop()} (already ingested)`
-        : `  + ${a.path.split('/').pop()}: +${r.gained.length} followers, -${r.lost.length}`);
-      const msg = unfollowerMessage(r.lost);
-      if (msg) notify('Instagram Tracker', msg);
+    for (const a of r.archives) {
+      console.log(a.skipped
+        ? `  = ${a.name} (already ingested)`
+        : `  + ${a.name}: +${a.gained} followers, -${a.lost.length}`);
     }
-    for (const c of [...captures].reverse()) {
-      const r = await ingestCapture(db, c.path);
-      console.log(`  + ${c.path.split('/').pop()}: ${r.skipped ? 'invalid' : r.rows + ' inbound rows'}`);
+    for (const c of r.captures) {
+      console.log(`  + ${c.name}: ${c.skipped ? 'invalid' : c.rows + ' inbound rows'}`);
     }
+
+    const msg = unfollowerMessage(r.newUnfollowers);
+    if (msg) notify('Instagram Tracker', msg);
 
     console.log('\n' + formatStatus(status(db, now())));
     break;
