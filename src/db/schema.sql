@@ -13,8 +13,11 @@ CREATE TABLE IF NOT EXISTS snapshot (
 );
 
 CREATE TABLE IF NOT EXISTS account (
-  id          INTEGER PRIMARY KEY,
-  username    TEXT NOT NULL UNIQUE,
+  id           INTEGER PRIMARY KEY,
+  username     TEXT NOT NULL UNIQUE,
+  -- Instagram derives a DM thread's folder name from the display name, not the
+  -- username, so without this 85% of threads cannot be joined to the graph.
+  display_name TEXT,
   first_seen  INTEGER,
   last_seen   INTEGER,
   merged_into INTEGER REFERENCES account(id)

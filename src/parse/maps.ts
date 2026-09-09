@@ -2,7 +2,7 @@ import type { RowSink } from './parseArchive.js';
 
 export interface TopicRow { kind: string; value: string }
 export interface SearchRow { term: string; occurredAt: number | null }
-export interface MyPostRow { postedAt: number | null; caption: string | null; mediaType: string | null }
+export interface MyPostRow { postedAt: number | null; caption: string | null; mediaType: string | null; uri: string | null }
 
 /**
  * The leading (^|\/) anchor matters: without it this also matches

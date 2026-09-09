@@ -34,12 +34,45 @@ describe('parseCapture', () => {
 
   it('lowercases usernames and keeps comment text', () => {
     const p = parseCapture(capture('post_comments', [{ username: 'Bob', text: 'nice' }]))!;
-    expect(p.items).toEqual([{ username: 'bob', text: 'nice' }]);
+    expect(p.items).toEqual([{ username: 'bob', text: 'nice', name: null }]);
   });
 
   it('drops items with no usable username', () => {
     const p = parseCapture(capture('post_likes', [{ username: '' }, { nope: 1 }, { username: 'ok' }]))!;
-    expect(p.items).toEqual([{ username: 'ok', text: null }]);
+    expect(p.items).toEqual([{ username: 'ok', text: null, name: null }]);
+  });
+});
+
+describe('display names', () => {
+  it('stores the display name the export never provides', async () => {
+    const db = openDb(':memory:');
+    await ingestCapture(db, write('ig-capture-profile_list-1.json',
+      capture('profile_list', [
+        { username: 'marcusdaley', name: 'Marcus' },
+        { username: 'harrietvale', name: 'Harriet Vale' },
+      ])));
+    const rows = db.prepare('SELECT username, display_name FROM account ORDER BY username').all() as any[];
+    expect(rows).toEqual([
+      { username: 'marcusdaley', display_name: 'Marcus' },
+      { username: 'harrietvale', display_name: 'Harriet Vale' },
+    ]);
+  });
+
+  it('does not record a follower list as engagement', async () => {
+    const db = openDb(':memory:');
+    await ingestCapture(db, write('ig-capture-profile_list-1.json',
+      capture('profile_list', [{ username: 'someone', name: 'Some One' }])));
+    // Otherwise everyone who follows you becomes a superfan.
+    expect(count(db, "SELECT COUNT(*) c FROM interaction")).toBe(0);
+  });
+
+  it('picks up display names from a like capture too', async () => {
+    const db = openDb(':memory:');
+    await ingestCapture(db, write('ig-capture-post_likes-1.json',
+      capture('post_likes', [{ username: 'fan', name: 'A Fan' }])));
+    const r = db.prepare('SELECT display_name FROM account WHERE username=?').get('fan') as any;
+    expect(r.display_name).toBe('A Fan');
+    expect(count(db, "SELECT COUNT(*) c FROM interaction WHERE kind='like_received'")).toBe(1);
   });
 });
 

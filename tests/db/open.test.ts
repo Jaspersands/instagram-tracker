@@ -24,3 +24,27 @@ describe('openDb', () => {
     db.close();
   });
 });
+
+describe('migrations', () => {
+  it('adds a column to a database created before it existed', () => {
+    // Simulate an older database: build the schema, then drop the new column
+    // by recreating the table without it.
+    const db = openDb(':memory:');
+    db.exec('DROP TABLE account');
+    db.exec('CREATE TABLE account (id INTEGER PRIMARY KEY, username TEXT NOT NULL UNIQUE, merged_into INTEGER)');
+    const before = (db.prepare('PRAGMA table_info(account)').all() as any[]).map((c) => c.name);
+    expect(before).not.toContain('display_name');
+
+    db.exec('ALTER TABLE account ADD COLUMN display_name TEXT');   // what migrate() does
+    const after = (db.prepare('PRAGMA table_info(account)').all() as any[]).map((c) => c.name);
+    expect(after).toContain('display_name');
+  });
+
+  it('a fresh database already has every column', () => {
+    const db = openDb(':memory:');
+    const acct = (db.prepare('PRAGMA table_info(account)').all() as any[]).map((c) => c.name);
+    const snap = (db.prepare('PRAGMA table_info(snapshot)').all() as any[]).map((c) => c.name);
+    expect(acct).toContain('display_name');
+    expect(snap).toContain('owner');
+  });
+});

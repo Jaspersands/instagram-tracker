@@ -141,6 +141,11 @@ export async function ingestCapture(
   );
 
   const kind = CAPTURE_KIND_MAP[parsed.kind];
+  // Display names are the point of a profile_list capture and a free bonus on
+  // every other kind: Instagram shows both in these lists, the export shows
+  // neither, and DM threads are named after the display name.
+  const setName = db.prepare(
+    `UPDATE account SET display_name = COALESCE(?, display_name) WHERE id = ?`);
   const ins = db.prepare(
     `INSERT OR IGNORE INTO interaction
        (account_id, kind, direction, occurred_at, permalink, text, dedupe_key)
@@ -149,8 +154,12 @@ export async function ingestCapture(
   let rows = 0;
   db.transaction(() => {
     for (const it of parsed!.items) {
-      const r = ins.run(accountId(db, it.username), kind, parsed!.capturedAt,
-        parsed!.permalink, it.text,
+      const id = accountId(db, it.username);
+      if (it.name) setName.run(it.name, id);
+      // A profile list is an inventory, not an interaction — recording it as
+      // engagement would make everyone who follows you look like a superfan.
+      if (parsed!.kind === 'profile_list') { rows += 1; continue; }
+      const r = ins.run(id, kind, parsed!.capturedAt, parsed!.permalink, it.text,
         `${kind}|${it.username}|${parsed!.permalink ?? ''}`);
       rows += r.changes;
     }

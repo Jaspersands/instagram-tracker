@@ -1,6 +1,6 @@
-export type CaptureKind = 'post_likes' | 'post_comments' | 'story_viewers';
+export type CaptureKind = 'post_likes' | 'post_comments' | 'story_viewers' | 'profile_list';
 
-export interface CaptureItem { username: string; text: string | null }
+export interface CaptureItem { username: string; text: string | null; name: string | null }
 export interface ParsedCapture {
   kind: CaptureKind;
   permalink: string | null;
@@ -13,6 +13,9 @@ export const CAPTURE_KIND_MAP: Record<CaptureKind, string> = {
   post_likes: 'like_received',
   post_comments: 'comment_received',
   story_viewers: 'story_view',
+  // A follower/following list is captured purely for the display names, which
+  // the export omits entirely and which DM threads are named after.
+  profile_list: 'profile_listed',
 };
 
 export function isCaptureFile(path: string): boolean {
@@ -34,7 +37,11 @@ export function parseCapture(json: unknown): ParsedCapture | null {
     const it = raw as Record<string, unknown>;
     const username = typeof it.username === 'string' ? it.username.trim().toLowerCase() : '';
     if (!username) continue;
-    items.push({ username, text: typeof it.text === 'string' ? it.text : null });
+    items.push({
+      username,
+      text: typeof it.text === 'string' ? it.text : null,
+      name: typeof it.name === 'string' && it.name.trim() ? it.name.trim() : null,
+    });
   }
 
   return {
