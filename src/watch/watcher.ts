@@ -16,6 +16,12 @@ export function watchFolder(
 ): Promise<void> {
   const watcher = chokidar.watch(Array.isArray(dirs) ? dirs : [dirs], {
     ignoreInitial: false,
+    // Downloads folders are large and deep. Exports land at the top level, or one
+    // level down inside a dated folder for a scheduled cloud transfer — watching
+    // an 11GB tree recursively would burn file handles for nothing.
+    depth: 2,
+    // Skip dotfiles and the package trees that dominate a Downloads folder.
+    ignored: (p: string) => /(^|\/)\.[^/]|\/node_modules\//.test(p),
     awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 200 },
   });
 
