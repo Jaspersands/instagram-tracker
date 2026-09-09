@@ -7,6 +7,7 @@ export interface InventoryRow {
   count: number;
   sourceId: string | null;
   sampleKeys: string[];
+  sample: unknown;
 }
 
 export async function inventory(zipPath: string): Promise<InventoryRow[]> {
@@ -15,10 +16,12 @@ export async function inventory(zipPath: string): Promise<InventoryRow[]> {
   await eachJsonEntry(zipPath, async (src) => {
     let count = 0;
     let sampleKeys: string[] = [];
+    let sample: unknown = null;
     try {
       for await (const item of src.items()) {
         if (count === 0 && item && typeof item === 'object') {
           sampleKeys = Object.keys(item as Record<string, unknown>);
+          sample = item;
         }
         count++;
       }
@@ -31,6 +34,7 @@ export async function inventory(zipPath: string): Promise<InventoryRow[]> {
       count,
       sourceId: matchSource(src.path)?.id ?? null,
       sampleKeys,
+      sample,
     });
   });
 
@@ -51,4 +55,42 @@ export function formatInventory(rows: InventoryRow[]): string {
     '',
     ...lines,
   ].join('\n');
+}
+
+/**
+ * For every file no parser claims, work out which family it belongs to and print
+ * a ready-to-paste entry. Instagram's layout drifts, so this turns "the export
+ * changed" from an investigation into an edit.
+ */
+export function proposeRegistry(rows: InventoryRow[]): string {
+  const unmatched = rows.filter((r) => !r.sourceId && r.count > 0);
+  if (unmatched.length === 0) return 'Every file with rows is claimed by a parser. Nothing to add.';
+
+  const out: string[] = [`${unmatched.length} unmatched file(s) with rows:`, ''];
+
+  for (const r of unmatched) {
+    const file = r.path.split('/').pop() ?? r.path;
+    const item = (r.sample ?? {}) as Record<string, unknown>;
+    const esc = file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    out.push(`  ${file}  (${r.count} rows)`);
+
+    if (r.sampleKeys.includes('string_list_data')) {
+      // A non-empty title means the person is the title and value holds
+      // something else (an emoji, for likes). Empty title means value is the person.
+      const from = typeof item.title === 'string' && item.title.trim() ? 'title' : 'value';
+      out.push(`    family: string_list_data — add to SOURCES in src/parse/registry.ts:`);
+      out.push(`      { id: '${file.replace(/\.json$/, '')}', match: /${esc}$/i, usernameFrom: '${from}',`);
+      out.push(`        target: { kind: 'interaction', interactionKind: 'TODO', direction: 'out' } },`);
+    } else if (r.sampleKeys.includes('string_map_data')) {
+      const keys = Object.keys((item.string_map_data ?? {}) as Record<string, unknown>);
+      out.push(`    family: string_map_data — add to MAPS in src/parse/parseArchive.ts`);
+      out.push(`      map keys: ${keys.join(', ') || '(none)'}`);
+    } else if (r.sampleKeys.includes('messages') || r.sampleKeys.includes('participants')) {
+      out.push(`    family: message thread — should already match isMessageFile(); check the path regex`);
+    } else {
+      out.push(`    family: unknown — keys: ${r.sampleKeys.join(', ') || '(none)'}`);
+    }
+    out.push('');
+  }
+  return out.join('\n');
 }

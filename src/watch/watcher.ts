@@ -11,10 +11,10 @@ import { isCaptureFile } from '../parse/capture.js';
  */
 export function watchFolder(
   db: Db,
-  dir: string,
+  dirs: string | string[],
   onIngest: (r: { zipPath: string; lost: string[]; captured?: number }) => void,
 ): Promise<void> {
-  const watcher = chokidar.watch(dir, {
+  const watcher = chokidar.watch(Array.isArray(dirs) ? dirs : [dirs], {
     ignoreInitial: false,
     awaitWriteFinish: { stabilityThreshold: 2000, pollInterval: 200 },
   });

@@ -16,6 +16,10 @@ working at your second one.
 
 ## Getting your data
 
+This is the only step that is genuinely yours — it lives behind your login, and
+automating it would mean driving a logged-in session, which is what gets accounts
+disabled.
+
 In the Instagram app: **Settings → Accounts Center → Your information and
 permissions → Download your information**.
 
@@ -23,23 +27,46 @@ permissions → Download your information**.
 - Format: **JSON** (not HTML — HTML is unparseable here)
 - Date range: **All time**
 
-Check whether your account offers a **cloud destination with a repeating
-schedule** (Google Drive, Dropbox, Koofr). If it does, point it at a synced
-folder and Instagram will push fresh exports on its own — fully zero-touch. If
-not, requesting an export takes about twenty seconds a month and the download
-lands in a watched folder that ingests itself.
+**Do this bit carefully, because it decides whether you ever touch this again:**
+on the delivery screen, check whether your account offers a **cloud destination
+with a repeating schedule** (Google Drive, Dropbox, Koofr). If it does, point it
+at Google Drive and set the longest schedule offered. Instagram then pushes fresh
+exports on its own, the agent ingests them, and the whole thing is genuinely
+zero-touch forever.
+
+If your account only offers a one-off download to device, that is ~20 seconds of
+tapping whenever you want fresh data. The agent still does everything after that;
+`npm run status` will tell you when your last export is getting stale.
 
 ## Usage
 
 ```bash
 npm install
+npm run install-agent
 ```
 
-Inspect an archive before trusting anything — this prints every JSON file, its
-row count, and whether a parser claims it:
+That is the whole setup. The agent runs at login, watches everywhere an export or
+capture plausibly lands (Downloads, Dropbox, Google Drive, iCloud Drive), ingests
+anything that appears, and sends a notification naming whoever unfollowed you. You
+never type a command again.
+
+If you would rather not run a background service:
 
 ```bash
-npm run inventory -- ~/Downloads/instagram-export.zip
+npm run auto      # find and ingest everything, then print status
+```
+
+`auto` scans the same folders, ingests exports oldest-first so the diffs are in
+order, picks up bookmarklet captures, and ignores unrelated zips.
+
+### The rest of the commands
+
+Inspect an archive — prints every JSON file, its row count, whether a parser
+claims it, and a ready-to-paste registry entry for anything unclaimed. With no
+argument it finds your newest export itself:
+
+```bash
+npm run inventory
 ```
 
 Ingest one archive (idempotent — re-ingesting the same file is a no-op):
@@ -48,12 +75,18 @@ Ingest one archive (idempotent — re-ingesting the same file is a no-op):
 npm run ingest -- ~/Downloads/instagram-export.zip
 ```
 
-Watch a folder and ingest anything that lands in it. New exports and bookmarklet
-captures are both picked up, and **you get a desktop notification naming who
-unfollowed you**:
+Watch folders in the foreground instead of via the agent (no argument watches all
+the usual places):
 
 ```bash
-npm run watch -- ~/Dropbox/Instagram
+npm run watch
+```
+
+Manage the background agent:
+
+```bash
+npm run agent-status
+npm run uninstall-agent
 ```
 
 Check where things stand — snapshot count, how stale your last export is, and
