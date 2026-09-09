@@ -38,7 +38,9 @@ export function status(db: Db, now: number): Status {
   const warnings: string[] = [];
 
   if (snapshots === 0) {
-    warnings.push('No exports ingested yet — run: npm run ingest -- <archive.zip>');
+    warnings.push(
+      'No exports ingested yet. Request one in the Instagram app, then press ' +
+      '"Pull new data" in the dashboard (or run: npm run auto).');
   } else {
     if (snapshots === 1) {
       warnings.push('Only one snapshot. Unfollower detection needs a second export to diff against.');

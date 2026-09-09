@@ -599,7 +599,7 @@ async function loadAll() {
 
   const latest = ov.snapshots[ov.snapshots.length - 1];
   $('#sub').textContent = ov.snapshots.length === 0
-    ? 'No exports ingested yet — run: npm run ingest -- <archive.zip>'
+    ? 'No exports ingested yet — press “Pull new data” once you have one'
     : `${ov.snapshots.length} snapshot${ov.snapshots.length === 1 ? '' : 's'} · last ${fmtDate(latest.takenAt)}`;
 
   const mutuals = ppl.filter((p) => p.followsMe && p.iFollow).length;
