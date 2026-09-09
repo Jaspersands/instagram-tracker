@@ -3,6 +3,7 @@ import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { isCaptureFile } from '../parse/capture.js';
+import { isExportArchive, isExportDir } from '../auto/discover.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 
 /**
@@ -39,7 +40,11 @@ export function watchFolder(
       }
       return;
     }
-    if (!zipPath.toLowerCase().endsWith('.zip')) return;
+    // Must be an Instagram export, not merely a zip. A watched Downloads folder
+    // is full of unrelated archives, and ingesting one reports every follower
+    // as having unfollowed you.
+    const name = zipPath.split('/').pop() ?? '';
+    if (!isExportArchive(name) && !isExportDir(name)) return;
     try {
       const r = await ingestAndDerive(db, zipPath);
       if (!r.skipped) onIngest({ zipPath, lost: r.lost });
