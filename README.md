@@ -42,10 +42,15 @@ tapping whenever you want fresh data. The agent still does everything after that
 
 ```bash
 npm install
-npm run serve
+npm run install-agent
 ```
 
-Open **http://127.0.0.1:4317** and press **Pull new data**.
+Then open **http://127.0.0.1:4317** — and keep using it. The agent runs the
+dashboard *and* the folder watcher at login, and restarts itself if either dies,
+so the site is always there.
+
+Without it, `npm run daemon` does the same thing for as long as that terminal
+lives. `npm run serve` is the dashboard alone.
 
 That button is the whole workflow. It scans Downloads, Dropbox, Google Drive and
 iCloud Drive, ingests any export or bookmarklet capture it finds, and refreshes
