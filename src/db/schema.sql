@@ -106,6 +106,10 @@ CREATE TABLE IF NOT EXISTS inbound_capture (
   captured_at INTEGER NOT NULL,
   kind        TEXT NOT NULL,
   permalink   TEXT,
+  -- 0 when the list was not scrolled to the end: the people it names really
+  -- did engage, but the ones it omits prove nothing.
+  complete    INTEGER NOT NULL DEFAULT 1,
+  expected    INTEGER,
   raw_json    TEXT NOT NULL
 );
 
