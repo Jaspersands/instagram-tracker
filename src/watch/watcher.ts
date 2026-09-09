@@ -3,6 +3,7 @@ import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { isCaptureFile } from '../parse/capture.js';
+import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 
 /**
  * chokidar 4 removed glob support, so this watches the directory itself and
@@ -12,7 +13,7 @@ import { isCaptureFile } from '../parse/capture.js';
 export function watchFolder(
   db: Db,
   dirs: string | string[],
-  onIngest: (r: { zipPath: string; lost: string[]; captured?: number }) => void,
+  onIngest: (r: { zipPath: string; lost: string[]; captured?: number; linked?: number }) => void,
 ): Promise<void> {
   const watcher = chokidar.watch(Array.isArray(dirs) ? dirs : [dirs], {
     ignoreInitial: false,
@@ -29,7 +30,10 @@ export function watchFolder(
     if (isCaptureFile(zipPath)) {
       try {
         const c = await ingestCapture(db, zipPath);
-        if (!c.skipped) onIngest({ zipPath, lost: [], captured: c.rows });
+        // Display names just captured may resolve threads ingested long ago —
+        // the whole point of a profile_list capture.
+        const linked = applyIdentities(db, resolveIdentities(db));
+        if (!c.skipped) onIngest({ zipPath, lost: [], captured: c.rows, linked });
       } catch (err) {
         console.error(`failed to ingest capture ${zipPath}:`, err);
       }

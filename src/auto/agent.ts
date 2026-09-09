@@ -30,7 +30,9 @@ export interface AgentOptions {
  * exports and captures are ingested with no command ever typed again.
  */
 export function launchAgentPlist(o: AgentOptions): string {
-  const args = [o.nodeBin, o.tsxBin, join(o.projectDir, 'src/cli/index.ts'), 'watch', ...o.watchDirs];
+  // 'daemon' rather than 'watch': the agent must also keep the dashboard up,
+  // or the site is unreachable whenever no shell happens to be serving it.
+  const args = [o.nodeBin, o.tsxBin, join(o.projectDir, 'src/cli/index.ts'), 'daemon', ...o.watchDirs];
   const argXml = args.map((a) => `    <string>${escapeXml(a)}</string>`).join('\n');
 
   return `<?xml version="1.0" encoding="UTF-8"?>
