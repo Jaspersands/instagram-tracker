@@ -210,3 +210,43 @@ but appear in none of your captures), and reciprocity.
 
 `data/`, `*.db`, `exports/`, `*.zip` and `captures/` are gitignored. The database
 contains your full social graph and DM history; keep it that way.
+
+## What Meta's current export can and cannot tell you
+
+Verified against a real September 2026 export. Meta has migrated several files
+away from the older format, and in doing so **dropped the author from your
+likes**. This is a limitation of the export, not of this tool.
+
+| Signal | Rows here | Attributable to a person? |
+|---|---|---|
+| DMs | 86,223 | yes |
+| Comment likes | 5,787 | yes |
+| Story likes | 2,076 | yes, via the `/stories/<username>/` URL |
+| Comments you left | 1,536 | yes |
+| Accounts you unfollowed | 223 | yes, with dates |
+| Profile searches | 35 | yes |
+| **Liked posts** | **33,713** | **no** — the record is only `/p/<shortcode>` |
+| **Saves** | **539** | **no** |
+| **Posts/videos viewed** | **939** | **no** |
+
+Unattributable events are kept in an `activity` table for their timestamps, so
+the habits heatmap and volume trend still cover everything you did. They just
+can't say who it was aimed at.
+
+The practical consequence: **"who do I like most" cannot be answered from a
+current export**, and the lurk gap is limited to what the bookmarklet captures.
+Closeness is driven by DMs, comments and story likes instead.
+
+If Meta restores authors, no change is needed — every handler tries the older
+shape first and falls back.
+
+### Delivery quirks worth knowing
+
+- A **Google Drive transfer arrives unzipped**, as folders inside a
+  `meta-2026-Sep-08-18-57-05` wrapper — note the month *name*, unlike the
+  `2026-09-08` in a device download. Both are handled.
+- **Cloud mounts are on-demand filesystems.** Reading this export's 837 JSON
+  files in place took ten and a half minutes, since each cold read is a network
+  fetch. Exports on a cloud mount are copied to `data/staged/` once — JSON only,
+  which takes about ninety seconds and skips the 3,371 media files including DM
+  attachments.
