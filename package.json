@@ -17,7 +17,8 @@
     "auto": "tsx src/cli/index.ts auto",
     "install-agent": "tsx src/cli/index.ts install-agent",
     "uninstall-agent": "tsx src/cli/index.ts uninstall-agent",
-    "agent-status": "tsx src/cli/index.ts agent-status"
+    "agent-status": "tsx src/cli/index.ts agent-status",
+    "daemon": "tsx src/cli/index.ts daemon"
   },
   "keywords": [],
   "author": "",

@@ -24,6 +24,10 @@ describe('launchAgentPlist', () => {
     logPath: '/Users/j/Library/Logs/igtracker.log',
   };
 
+  it('runs the daemon so the dashboard stays up, not just the watcher', () => {
+    expect(launchAgentPlist(opts)).toContain('<string>daemon</string>');
+  });
+
   it('produces a plist with the label, RunAtLoad and KeepAlive', () => {
     const p = launchAgentPlist(opts);
     expect(p).toContain('<?xml version="1.0"');

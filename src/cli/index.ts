@@ -137,6 +137,32 @@ switch (cmd) {
     break;
   }
 
+  case 'daemon': {
+    // Dashboard and watcher in one process, so a single LaunchAgent keeps both
+    // alive. Running only the watcher meant the dashboard died with whatever
+    // shell started it, and the site simply could not be reached.
+    const port = Number(process.env.PORT ?? 4317);
+    const dirs = args.length ? args : candidateDirs();
+    const db = openDb(DB_PATH);
+
+    const app = buildServer(db);
+    await app.listen({ port, host: '127.0.0.1' });
+    console.log(`dashboard on http://127.0.0.1:${port}`);
+    console.log(`watching:\n  ${dirs.join('\n  ')}`);
+
+    await watchFolder(db, dirs, ({ zipPath, lost, captured, linked }) => {
+      console.log(`ingested ${zipPath}`);
+      if (captured !== undefined) console.log(`  ${captured} inbound row(s) captured`);
+      if (linked) console.log(`  ${linked} DM thread(s) linked to a profile`);
+      if (lost.length) {
+        console.log(`  ${lost.length} unfollower(s): ${lost.join(', ')}`);
+        const msg = unfollowerMessage(lost);
+        if (msg) notify('Instagram Tracker', msg);
+      }
+    });
+    break;
+  }
+
   case 'serve': {
     const port = Number(process.env.PORT ?? 4317);
     const app = buildServer(openDb(DB_PATH));
@@ -152,9 +178,10 @@ switch (cmd) {
     if (!dirs.length) { console.error('usage: watch <folder...>'); process.exit(1); }
     const db = openDb(DB_PATH);
     console.log(`watching for exports and captures:\n  ${dirs.join('\n  ')}`);
-    await watchFolder(db, dirs, ({ zipPath, lost, captured }) => {
+    await watchFolder(db, dirs, ({ zipPath, lost, captured, linked }) => {
       console.log(`ingested ${zipPath}`);
       if (captured !== undefined) console.log(`  ${captured} inbound row(s) captured`);
+      if (linked) console.log(`  ${linked} DM thread(s) linked to a profile`);
       if (lost.length) {
         console.log(`  ${lost.length} unfollower(s): ${lost.join(', ')}`);
         const msg = unfollowerMessage(lost);
@@ -174,6 +201,7 @@ switch (cmd) {
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
       '  serve                    dashboard on 127.0.0.1',
+      '  daemon                   dashboard + watcher together (what the agent runs)',
       '  watch <dir...>           ingest anything that lands, forever',
       '  install-agent            run the watcher at login, permanently',
       '  uninstall-agent          stop and remove it',
