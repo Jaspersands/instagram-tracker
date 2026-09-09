@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import type { Db } from '../db/open.js';
 import type {
   RowSink, FollowEdgeRow, ListRow, InteractionRow, ImpressionRow, FileRow,
+  ActivityRow,
 } from '../parse/parseArchive.js';
 import type { TopicRow, SearchRow, MyPostRow } from '../parse/maps.js';
 
@@ -38,6 +39,10 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     `INSERT OR IGNORE INTO my_post (posted_at, caption, media_type, dedupe_key)
      VALUES (?, ?, ?, ?)`);
 
+  const insActivity = db.prepare(
+    `INSERT OR IGNORE INTO activity (kind, occurred_at, permalink, dedupe_key)
+     VALUES (?, ?, ?, ?)`);
+
   const files: FileRow[] = [];
 
   return {
@@ -64,6 +69,10 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     post(r: MyPostRow) {
       insPost.run(r.postedAt, r.caption, r.mediaType,
         `${r.postedAt ?? ''}|${(r.caption ?? '').slice(0, 120)}`);
+    },
+    activity(r: ActivityRow) {
+      insActivity.run(r.kind, r.occurredAt, r.permalink,
+        `${r.kind}|${r.occurredAt ?? ''}|${r.permalink ?? ''}`);
     },
     file(r: FileRow) { files.push(r); },
     flush() { /* better-sqlite3 writes synchronously; nothing buffered */ },

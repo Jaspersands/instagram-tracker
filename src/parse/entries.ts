@@ -1,5 +1,8 @@
 export type UsernameSource = 'title' | 'value';
 
+/** Instagram usernames: letters, digits, periods, underscores, max 30. */
+const USERNAME_RE = /^[a-z0-9._]{1,30}$/;
+
 export interface NormalizedEntry {
   username: string;
   href: string | null;
@@ -42,10 +45,18 @@ export function normalizeEntry(
   const href = sld && typeof sld.href === 'string' ? sld.href : null;
   const timestamp = sld && typeof sld.timestamp === 'number' ? sld.timestamp : null;
 
-  const username = (usernameFrom === 'title' ? title : value)?.trim().toLowerCase();
-  if (!username) return null;
+  const preferred = (usernameFrom === 'title' ? title : value)?.trim().toLowerCase();
+  if (preferred) return { username: preferred, href, timestamp, value };
 
-  return { username, href, timestamp, value };
+  // The two halves of the follow graph disagree: followers_1.json carries the
+  // username in string_list_data[0].value with an empty title, while
+  // following.json carries it in title and omits value entirely. Fall back to
+  // the other field — but only if it actually looks like a username, since
+  // liked_posts puts an emoji in value and a caption would sail through.
+  const other = (usernameFrom === 'title' ? value : title)?.trim().toLowerCase();
+  if (other && USERNAME_RE.test(other)) return { username: other, href, timestamp, value };
+
+  return null;
 }
 
 export function normalizeEntries(

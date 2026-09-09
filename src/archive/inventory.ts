@@ -1,5 +1,5 @@
 import { eachJsonEntry } from './reader.js';
-import { matchSource } from '../parse/registry.js';
+import { classify } from '../parse/parseArchive.js';
 
 export interface InventoryRow {
   path: string;
@@ -32,7 +32,7 @@ export async function inventory(zipPath: string): Promise<InventoryRow[]> {
       path: src.path,
       size: src.size,
       count,
-      sourceId: matchSource(src.path)?.id ?? null,
+      sourceId: classify(src.path),
       sampleKeys,
       sample,
     });

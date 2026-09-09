@@ -8,6 +8,7 @@ export interface Status {
   accounts: number;
   interactions: number;
   impressions: number;
+  activity: number;
   captures: number;
   unfollowers: number;
   warnings: string[];
@@ -57,7 +58,7 @@ export function status(db: Db, now: number): Status {
   return {
     snapshots, lastExport, daysSinceExport, followers,
     accounts: n('account'), interactions: n('interaction'),
-    impressions: n('impression'), captures,
+    impressions: n('impression'), activity: n('activity'), captures,
     unfollowers: (db.prepare(
       "SELECT COUNT(*) AS c FROM graph_event WHERE kind = 'lost_follower'",
     ).get() as { c: number }).c,
@@ -76,6 +77,7 @@ export function formatStatus(s: Status): string {
     ['people known', String(s.accounts)],
     ['interactions', String(s.interactions)],
     ['posts seen', String(s.impressions)],
+    ['unattributed acts', String(s.activity)],
     ['inbound captures', String(s.captures)],
   ];
   const out = rows.map(([k, v]) => `  ${k.padEnd(18)} ${v}`);

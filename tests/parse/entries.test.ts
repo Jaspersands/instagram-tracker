@@ -79,3 +79,46 @@ describe('normalizeEntry', () => {
     expect(normalizeEntry({ nope: 1 }, 'value')).toBeNull();
   });
 });
+
+describe('username source fallback', () => {
+  // followers_1.json puts the username in string_list_data[0].value with an
+  // empty title; following.json puts it in title and omits value entirely.
+  // Reading one convention for both silently dropped all 1,359 follows.
+  const followersShape = {
+    relationships_followers: [
+      { title: '', media_list_data: [], string_list_data: [
+        { href: 'https://www.instagram.com/pip_thornbury', value: 'pip_thornbury', timestamp: 1788829514 }] },
+    ],
+  };
+  const followingShape = {
+    relationships_following: [
+      { title: 'pip_thornbury', string_list_data: [
+        { href: 'https://www.instagram.com/_u/pip_thornbury', timestamp: 1788829516 }] },
+    ],
+  };
+
+  it('reads followers from value', () => {
+    expect(normalizeEntries(followersShape, 'value')[0].username).toBe('pip_thornbury');
+  });
+
+  it('falls back to title when value is absent', () => {
+    expect(normalizeEntries(followingShape, 'value')[0].username).toBe('pip_thornbury');
+  });
+
+  it('falls back to value when title is empty', () => {
+    expect(normalizeEntries(followersShape, 'title')[0].username).toBe('pip_thornbury');
+  });
+
+  it('refuses a fallback that is not username-shaped', () => {
+    // liked_posts has title=author and value=emoji. Falling back blindly would
+    // record "❤️" as a person.
+    const emoji = { x: [{ title: '', string_list_data: [{ href: 'p', value: '❤️', timestamp: 1 }] }] };
+    expect(normalizeEntries(emoji, 'title')).toEqual([]);
+  });
+
+  it('still refuses a caption-length string as a username', () => {
+    const caption = { x: [{ title: '', string_list_data: [
+      { href: 'p', value: 'what a lovely day out here in the park', timestamp: 1 }] }] };
+    expect(normalizeEntries(caption, 'title')).toEqual([]);
+  });
+});

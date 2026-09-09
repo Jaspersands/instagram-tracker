@@ -20,6 +20,14 @@ export interface PersonRow {
 
 type InterRow = { accountId: number; kind: string; direction: 'out' | 'in'; occurredAt: number | null };
 
+/** Usernames that are me, not someone I interact with. */
+export function ownerUsernames(db: Db): Set<string> {
+  const rows = db.prepare(
+    'SELECT DISTINCT owner FROM snapshot WHERE owner IS NOT NULL',
+  ).all() as { owner: string }[];
+  return new Set(rows.map((r) => r.owner));
+}
+
 function latestSnapshotId(db: Db): number | null {
   return (db.prepare('SELECT MAX(id) AS id FROM snapshot').get() as { id: number | null }).id;
 }
@@ -38,9 +46,11 @@ function canonicalIds(db: Db): Map<number, number> {
 }
 
 export function people(db: Db, now: number): PersonRow[] {
-  const accounts = db.prepare(
+  const owners = ownerUsernames(db);
+  const accounts = (db.prepare(
     'SELECT id, username FROM account WHERE merged_into IS NULL',
-  ).all() as { id: number; username: string }[];
+  ).all() as { id: number; username: string }[])
+    .filter((a) => !owners.has(a.username));
   if (accounts.length === 0) return [];
 
   const canon = canonicalIds(db);
@@ -155,8 +165,12 @@ export function habits(db: Db) {
   const heatmap: number[][] = Array.from({ length: 7 }, () => new Array(24).fill(0));
   const byMonth = new Map<string, number>();
 
+  // Union both: the newer export leaves 33k likes unattributed, and dropping
+  // them would hollow out the heatmap that shows when you are actually active.
   const rows = db.prepare(
-    'SELECT occurred_at AS t FROM interaction WHERE occurred_at IS NOT NULL',
+    `SELECT occurred_at AS t FROM interaction WHERE occurred_at IS NOT NULL
+     UNION ALL
+     SELECT occurred_at AS t FROM activity    WHERE occurred_at IS NOT NULL`,
   ).all() as { t: number }[];
 
   for (const { t } of rows) {
@@ -174,7 +188,7 @@ export function habits(db: Db) {
 
 export function taste(db: Db) {
   const topics = db.prepare(
-    `SELECT kind, value FROM topic WHERE kind IN ('your_topic','ad_interest')
+    `SELECT kind, value FROM topic WHERE kind IN ('your_topic','ad_interest','ai_interest')
       GROUP BY kind, value ORDER BY kind, value`,
   ).all() as { kind: string; value: string }[];
 

@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS snapshot (
   source        TEXT NOT NULL,
   sha256        TEXT NOT NULL UNIQUE,
   archive_path  TEXT,
+  owner         TEXT,
   manifest_json TEXT
 );
 
@@ -55,6 +56,18 @@ CREATE TABLE IF NOT EXISTS impression (
   dedupe_key  TEXT NOT NULL UNIQUE
 );
 
+-- Things I did that the export no longer attributes to anyone. Meta's newer
+-- format records a liked post only as /p/<shortcode> with no author, so 33k
+-- likes cannot reach the interaction table — but their timestamps still drive
+-- the activity heatmap and volume-over-time.
+CREATE TABLE IF NOT EXISTS activity (
+  id          INTEGER PRIMARY KEY,
+  kind        TEXT NOT NULL,
+  occurred_at INTEGER,
+  permalink   TEXT,
+  dedupe_key  TEXT NOT NULL UNIQUE
+);
+
 CREATE TABLE IF NOT EXISTS list_membership (
   snapshot_id INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
   account_id  INTEGER NOT NULL REFERENCES account(id),
@@ -98,3 +111,4 @@ CREATE INDEX IF NOT EXISTS ix_inter_acct ON interaction(account_id, kind);
 CREATE INDEX IF NOT EXISTS ix_inter_time ON interaction(occurred_at);
 CREATE INDEX IF NOT EXISTS ix_impr_acct  ON impression(account_id);
 CREATE INDEX IF NOT EXISTS ix_event_acct ON graph_event(account_id, kind);
+CREATE INDEX IF NOT EXISTS ix_activity_time ON activity(occurred_at);

@@ -17,3 +17,16 @@ export function makeZip(files: Record<string, unknown>): string {
   execFileSync('zip', ['-q', '-r', zipPath, '.'], { cwd: root });
   return zipPath;
 }
+
+/** Build an *unzipped* export tree on disk — how Meta delivers to Google Drive. */
+export function makeDir(files: Record<string, unknown>): string {
+  const dir = mkdtempSync(join(tmpdir(), 'igdir-'));
+  const root = join(dir, 'instagram-jasper_sands-2026-09-08-jBKMGcaq');
+  mkdirSync(root, { recursive: true });
+  for (const [rel, value] of Object.entries(files)) {
+    const full = join(root, rel);
+    mkdirSync(dirname(full), { recursive: true });
+    writeFileSync(full, typeof value === 'string' ? value : JSON.stringify(value));
+  }
+  return root;
+}

@@ -1,7 +1,9 @@
 import type { RowSink } from './parseArchive.js';
 
 export function isMessageFile(path: string): boolean {
-  return /messages\/inbox\/[^/]+\/message_\d+\.json$/i.test(path);
+  // Message requests are real threads too — often the only record of someone
+  // who contacted you and was never accepted.
+  return /messages\/(inbox|message_requests)\/[^/]+\/message_\d+\.json$/i.test(path);
 }
 
 /**

@@ -1,5 +1,7 @@
 import yauzl from 'yauzl';
 import { Readable } from 'node:stream';
+import { createReadStream, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 import { parser } from 'stream-json';
 import { pick } from 'stream-json/filters/pick.js';
 import { streamArray } from 'stream-json/streamers/stream-array.js';
@@ -57,7 +59,77 @@ async function* streamItems(open: () => Promise<Readable>, wrapperKey: string | 
   }
 }
 
-export function eachJsonEntry(
+/**
+ * Walk an export, whether it arrived as a .zip (a download) or as an unzipped
+ * folder tree (how Meta delivers a transfer to Google Drive or Dropbox).
+ * Both yield the same JsonSource shape, so every caller is unchanged.
+ */
+export async function eachJsonEntry(
+  path: string,
+  onEntry: (src: JsonSource) => Promise<void>,
+): Promise<void> {
+  let isDir = false;
+  try { isDir = statSync(path).isDirectory(); } catch { isDir = false; }
+  return isDir ? eachDirJsonEntry(path, onEntry) : eachZipJsonEntry(path, onEntry);
+}
+
+/** Recursively yield every .json file under an unzipped export root. */
+export async function eachDirJsonEntry(
+  root: string,
+  onEntry: (src: JsonSource) => Promise<void>,
+): Promise<void> {
+  const files: string[] = [];
+
+  const walk = (dir: string) => {
+    let entries: string[] = [];
+    try { entries = readdirSync(dir); } catch { return; }
+    for (const name of entries) {
+      if (name.startsWith('.')) continue;
+      const full = join(dir, name);
+      let st;
+      try { st = statSync(full); } catch { continue; }
+      if (st.isDirectory()) walk(full);
+      else if (/\.json$/i.test(name)) files.push(full);
+    }
+  };
+  walk(root);
+  files.sort();
+
+  for (const full of files) {
+    const size = statSync(full).size;
+    // Relative, POSIX-separated: the registry matches on path suffixes.
+    const rel = relative(root, full).split(sep).join('/');
+
+    const src: JsonSource = {
+      path: rel,
+      size,
+      items: () => ({
+        async *[Symbol.asyncIterator]() {
+          if (size <= STREAM_THRESHOLD_BYTES) {
+            const json = JSON.parse(await bufferOf(createReadStream(full)).then((b) => b.toString('utf8')));
+            const arr = Array.isArray(json)
+              ? json
+              : Object.values(json ?? {}).find(Array.isArray) ?? [];
+            yield* arr as unknown[];
+          } else {
+            const head = await headOf(createReadStream(full), 4096);
+            yield* streamItems(async () => createReadStream(full), detectWrapperKey(head));
+          }
+        },
+      }),
+      raw: async () => {
+        if (size > STREAM_THRESHOLD_BYTES) {
+          throw new Error(`refusing to buffer ${rel} (${size} bytes)`);
+        }
+        return JSON.parse((await bufferOf(createReadStream(full))).toString('utf8'));
+      },
+    };
+
+    await onEntry(src);
+  }
+}
+
+function eachZipJsonEntry(
   zipPath: string,
   onEntry: (src: JsonSource) => Promise<void>,
 ): Promise<void> {

@@ -1,6 +1,18 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openDb } from '../../src/db/open.js';
 import { buildServer } from '../../src/server/server.js';
+
+// Without this the refresh route scans the real Downloads and Google Drive
+// folders — a FUSE network mount that made this test take ~50 seconds.
+const prev = process.env.IG_WATCH_DIRS;
+beforeAll(() => { process.env.IG_WATCH_DIRS = mkdtempSync(join(tmpdir(), 'empty-')); });
+afterAll(() => {
+  if (prev === undefined) delete process.env.IG_WATCH_DIRS;
+  else process.env.IG_WATCH_DIRS = prev;
+});
 
 describe('POST /api/refresh', () => {
   it('returns a result and current status even when nothing is found', async () => {

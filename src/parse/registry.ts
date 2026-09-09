@@ -17,7 +17,8 @@ export const SOURCES: SourceDef[] = [
   // --- graph ---
   { id: 'followers', match: /followers_\d+\.json$/i, usernameFrom: 'value',
     target: { kind: 'follow_edge', direction: 'follows_me' } },
-  { id: 'following', match: /(^|\/)following\.json$/i, usernameFrom: 'value',
+  // following.json names the person in `title`; followers_1.json uses `value`.
+  { id: 'following', match: /(^|\/)following\.json$/i, usernameFrom: 'title',
     target: { kind: 'follow_edge', direction: 'i_follow' } },
 
   // --- lists ---
@@ -45,6 +46,10 @@ export const SOURCES: SourceDef[] = [
     target: { kind: 'interaction', interactionKind: 'like_story', direction: 'out' } },
   { id: 'saved_posts', match: /saved_(posts|collections)\.json$/i, usernameFrom: 'title',
     target: { kind: 'interaction', interactionKind: 'save', direction: 'out' } },
+
+  // Accounts I looked up. string_list_data with the username in `title`.
+  { id: 'profile_searches', match: /profile_searches\.json$/i, usernameFrom: 'title',
+    target: { kind: 'interaction', interactionKind: 'profile_search', direction: 'out' } },
 
   // --- inbound from the export ---
   { id: 'tagged', match: /(tagged|mentions)\w*\.json$/i, usernameFrom: 'title',

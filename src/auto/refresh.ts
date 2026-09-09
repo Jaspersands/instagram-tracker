@@ -3,11 +3,12 @@ import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { candidateDirs, findInputs } from './discover.js';
+import { localCopyOf, needsStaging } from './staging.js';
 
 export interface RefreshResult {
   scanned: string[];
   found: number;
-  archives: { name: string; skipped: boolean; gained: number; lost: string[] }[];
+  archives: { name: string; skipped: boolean; staged: boolean; gained: number; lost: string[] }[];
   captures: { name: string; skipped: boolean; rows: number }[];
   newUnfollowers: string[];
 }
@@ -29,16 +30,18 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
   };
 
   for (const a of [...archives].reverse()) {
-    const r = await ingestAndDerive(db, a.path);
+    // Cloud mounts are on-demand filesystems; copy locally before reading.
+    const path = localCopyOf(a.path);
+    const r = await ingestAndDerive(db, path);
     result.archives.push({
-      name: basename(a.path), skipped: r.skipped,
+      name: basename(a.path), skipped: r.skipped, staged: needsStaging(a.path),
       gained: r.gained.length, lost: r.lost,
     });
     result.newUnfollowers.push(...r.lost);
   }
 
   for (const c of [...captures].reverse()) {
-    const r = await ingestCapture(db, c.path);
+    const r = await ingestCapture(db, localCopyOf(c.path));
     result.captures.push({ name: basename(c.path), skipped: r.skipped, rows: r.rows });
   }
 

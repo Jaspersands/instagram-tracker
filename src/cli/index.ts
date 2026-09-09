@@ -10,6 +10,7 @@ import { status, formatStatus } from '../report/status.js';
 import { notify, unfollowerMessage } from '../notify/notify.js';
 import { candidateDirs, findInputs } from '../auto/discover.js';
 import { refreshAll } from '../auto/refresh.js';
+import { localCopyOf, needsStaging } from '../auto/staging.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 
@@ -31,8 +32,13 @@ switch (cmd) {
         process.exit(1);
       }
       target = archives[0].path;
-      console.log(`using ${target}\n`);
+      console.log(`using ${target}`);
     }
+    if (needsStaging(target)) {
+      console.log('copying out of the cloud mount first (one-off; every read there is a network fetch)…');
+    }
+    target = localCopyOf(target);
+    console.log('');
     const rows = await inventory(target);
     console.log(formatInventory(rows));
     console.log('\n' + proposeRegistry(rows));

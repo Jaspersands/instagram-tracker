@@ -1,4 +1,4 @@
-import { readdirSync, statSync } from 'node:fs';
+import { readdirSync, statSync, type Dirent } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
@@ -14,6 +14,19 @@ export function isExportArchive(name: string): boolean {
 
 export function isCaptureName(name: string): boolean {
   return /^ig-capture-.*\.json$/i.test(name);
+}
+
+/**
+ * A transfer to Google Drive or Dropbox arrives as an unzipped folder tree, not
+ * an archive — e.g. instagram-jasper_sands-2026-09-08-jBKMGcaq. The date is
+ * required so an unrelated folder that merely starts with "instagram" is not
+ * mistaken for an export.
+ */
+export function isExportDir(name: string): boolean {
+  if (!/^(instagram|meta|facebook)[-_]/i.test(name)) return false;
+  // A ZIP download is dated 2026-09-08; a Drive transfer folder is dated
+  // 2026-Sep-08. Both must match, and something with no date at all must not.
+  return /\d{4}-(\d{2}|[A-Za-z]{3})-\d{2}/.test(name);
 }
 
 /**
@@ -70,9 +83,17 @@ export function newestFirst(files: Found[]): Found[] {
   return [...files].sort((a, b) => b.mtime - a.mtime);
 }
 
+function safeMtime(p: string): number {
+  try { return statSync(p).mtimeMs; } catch { return 0; }
+}
+
 /**
- * Find exports and captures across the candidate directories. Scans one level
- * deep as well, since cloud transfers often land inside a dated subfolder.
+ * Find exports (zip archives and unzipped folders) and bookmarklet captures.
+ *
+ * Uses withFileTypes so directory entries are classified from the single
+ * readdir rather than a stat per entry, and only stats files whose names
+ * already match. These folders include Google Drive's FUSE mount, where a stat
+ * is a network round trip — the naive version took ~50 seconds.
  */
 export function findInputs(dirs: string[] = candidateDirs()): {
   archives: Found[]; captures: Found[];
@@ -80,26 +101,25 @@ export function findInputs(dirs: string[] = candidateDirs()): {
   const archives: Found[] = [];
   const captures: Found[] = [];
 
-  const consider = (full: string, name: string) => {
-    try {
-      const st = statSync(full);
-      if (!st.isFile()) return;
-      if (isExportArchive(name)) archives.push({ path: full, mtime: st.mtimeMs });
-      else if (isCaptureName(name)) captures.push({ path: full, mtime: st.mtimeMs });
-    } catch { /* unreadable entry */ }
+  const scan = (dir: string, depth: number) => {
+    let entries: Dirent[] = [];
+    try { entries = readdirSync(dir, { withFileTypes: true }); } catch { return; }
+
+    for (const e of entries) {
+      if (e.name.startsWith('.')) continue;
+      const full = join(dir, e.name);
+
+      if (e.isDirectory()) {
+        if (isExportDir(e.name)) archives.push({ path: full, mtime: safeMtime(full) });
+        else if (depth > 0) scan(full, depth - 1);
+      } else if (e.isFile()) {
+        if (isExportArchive(e.name)) archives.push({ path: full, mtime: safeMtime(full) });
+        else if (isCaptureName(e.name)) captures.push({ path: full, mtime: safeMtime(full) });
+      }
+    }
   };
 
-  for (const dir of dirs) {
-    for (const name of safeReaddir(dir)) {
-      const full = join(dir, name);
-      consider(full, name);
-      try {
-        if (statSync(full).isDirectory()) {
-          for (const inner of safeReaddir(full)) consider(join(full, inner), inner);
-        }
-      } catch { /* unreadable entry */ }
-    }
-  }
+  for (const dir of dirs) scan(dir, 1);
 
   return { archives: newestFirst(archives), captures: newestFirst(captures) };
 }
