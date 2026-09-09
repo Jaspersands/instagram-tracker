@@ -4,6 +4,7 @@ import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { candidateDirs, findInputs } from './discover.js';
 import { localCopyOf, needsStaging } from './staging.js';
+import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 
 export interface RefreshResult {
   scanned: string[];
@@ -11,6 +12,7 @@ export interface RefreshResult {
   archives: { name: string; skipped: boolean; staged: boolean; gained: number; lost: string[] }[];
   captures: { name: string; skipped: boolean; rows: number }[];
   newUnfollowers: string[];
+  linked: number;
 }
 
 /**
@@ -26,7 +28,7 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
 
   const result: RefreshResult = {
     scanned, found: archives.length + captures.length,
-    archives: [], captures: [], newUnfollowers: [],
+    archives: [], captures: [], newUnfollowers: [], linked: 0,
   };
 
   for (const a of [...archives].reverse()) {
@@ -44,6 +46,9 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
     const r = await ingestCapture(db, localCopyOf(c.path));
     result.captures.push({ name: basename(c.path), skipped: r.skipped, rows: r.rows });
   }
+
+  // Display names captured just now may resolve DM threads ingested long ago.
+  result.linked = applyIdentities(db, resolveIdentities(db));
 
   return result;
 }

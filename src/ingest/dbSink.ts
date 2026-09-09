@@ -67,8 +67,10 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     topic(r: TopicRow) { insTopic.run(snapshotId, r.kind, r.value); },
     search(r: SearchRow) { insSearch.run(r.term, r.occurredAt, `${r.term}|${r.occurredAt ?? ''}`); },
     post(r: MyPostRow) {
+      // Stories mostly have empty captions; without the uri, any two posted in
+      // the same second collapse into one.
       insPost.run(r.postedAt, r.caption, r.mediaType,
-        `${r.postedAt ?? ''}|${(r.caption ?? '').slice(0, 120)}`);
+        `${r.postedAt ?? ''}|${r.uri ?? ''}|${(r.caption ?? '').slice(0, 80)}`);
     },
     activity(r: ActivityRow) {
       insActivity.run(r.kind, r.occurredAt, r.permalink,

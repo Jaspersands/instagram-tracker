@@ -4,7 +4,7 @@ import { normalizeEntry } from './entries.js';
 import { isMessageFile, parseMessageThread } from './messages.js';
 import { mapValue, mapTimestamp, parseComment, COMMENT_FILE } from './maps.js';
 import type { TopicRow, SearchRow, MyPostRow } from './maps.js';
-import { labelUsername, labelTimestamp, labelUrl, labelValue, usernameFromStoryUrl } from './labels.js';
+import { labelUsername, labelTimestamp, labelUrl, labelValue, labelValueDeep, usernameFromStoryUrl } from './labels.js';
 
 export interface FollowEdgeRow { username: string; direction: 'follows_me' | 'i_follow'; since: number | null }
 export interface ListRow { username: string; list: string }
@@ -220,9 +220,60 @@ export const SPECIAL: SpecialDef[] = [
         : typeof media.creation_timestamp === 'number' ? media.creation_timestamp : null;
       const caption = typeof it.title === 'string' && it.title ? it.title
         : typeof media.title === 'string' ? media.title : null;
-      const uri = typeof media.uri === 'string' ? media.uri : '';
-      sink.post({ postedAt, caption, mediaType: /\.mp4$/i.test(uri) ? 'video' : 'image' });
+      const uri = typeof media.uri === 'string' ? media.uri : null;
+      sink.post({ postedAt, caption, uri,
+                  mediaType: /\.mp4$/i.test(uri ?? '') ? 'video' : 'image' });
     } },
+
+  // My own stories and archived posts: flat records with a uri and timestamp
+  // rather than a media[] array.
+  { id: 'my_stories', match: /media\/(stories|archived_posts|other_content)\.json$/i,
+    handle: (i, sink) => {
+      if (!i || typeof i !== 'object') return;
+      const it = i as Record<string, unknown>;
+      const uri = typeof it.uri === 'string' ? it.uri : null;
+      const postedAt = typeof it.creation_timestamp === 'number' ? it.creation_timestamp : null;
+      if (!uri && postedAt === null) return;
+      sink.post({
+        postedAt,
+        caption: typeof it.title === 'string' && it.title ? it.title : null,
+        uri,
+        mediaType: /stories\//.test(uri ?? '') ? 'story'
+          : /\.mp4$/i.test(uri ?? '') ? 'video' : 'image',
+      });
+    } },
+
+  // Notes and reposts name the author, but two dicts deep under an "Author"
+  // group — a flat label scan finds nothing.
+  { id: 'note_reposts', match: /note_and_repost_interactions\.json$/i,
+    handle: (i, sink) => {
+      const u = labelValueDeep(i, 'Username');
+      if (u) sink.interaction({ username: u.trim().toLowerCase(), kind: 'note_interaction',
+                                direction: 'out', occurredAt: labelTimestamp(i),
+                                permalink: null, text: null });
+    } },
+
+  { id: 'not_interested_profiles', match: /profiles_you.*not_interested_in\.json$/i,
+    handle: (i, sink) => {
+      const u = labelUsername(i);
+      if (u) sink.impression({ username: u, kind: 'not_interested', occurredAt: labelTimestamp(i) });
+    } },
+
+  // Story interactions and ad/link history carry no author at all, but their
+  // timestamps belong in the activity picture.
+  ...([
+    ['story_polls', /story_interactions\/polls\.json$/i, 'poll_answered'],
+    ['story_quizzes', /story_interactions\/quizzes\.json$/i, 'quiz_answered'],
+    ['story_sliders', /story_interactions\/emoji_sliders\.json$/i, 'slider_answered'],
+    ['story_questions', /story_interactions\/questions\.json$/i, 'question_answered'],
+    ['stories_viewed', /stories_viewed\.json$/i, 'story_viewed'],
+    ['ads_viewed', /ads_viewed\.json$/i, 'ad_viewed'],
+    ['link_history', /link_history\.json$/i, 'link_opened'],
+  ] as const).map(([id, match, kind]) => ({
+    id, match,
+    handle: (i: unknown, sink: RowSink) =>
+      sink.activity({ kind, occurredAt: labelTimestamp(i), permalink: labelUrl(i) }),
+  })),
 ];
 
 /**

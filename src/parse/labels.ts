@@ -48,3 +48,30 @@ export function usernameFromStoryUrl(url: string | null): string | null {
 export function labelUrl(item: unknown): string | null {
   return labelValue(item, 'URL');
 }
+
+/**
+ * Some records nest their labels inside grouped dicts, e.g. note_and_repost
+ * carries the person under an "Author" group two levels down:
+ *   label_values: [{ title: 'Author', dict: [{ dict: [{label:'Username', ...}] }] }]
+ * A flat scan misses them entirely.
+ */
+export function labelValueDeep(node: unknown, label: string, depth = 0): string | null {
+  if (depth > 6 || !node || typeof node !== 'object') return null;
+
+  if (Array.isArray(node)) {
+    for (const child of node) {
+      const found = labelValueDeep(child, label, depth + 1);
+      if (found) return found;
+    }
+    return null;
+  }
+
+  const o = node as Record<string, unknown>;
+  if (o.label === label && typeof o.value === 'string') return o.value;
+
+  for (const key of ['label_values', 'dict']) {
+    const found = labelValueDeep(o[key], label, depth + 1);
+    if (found) return found;
+  }
+  return null;
+}

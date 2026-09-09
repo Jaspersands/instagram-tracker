@@ -18,8 +18,12 @@
     'challenge emails session ads business creators shop help privacy terms tv igtv ' +
     'your_activity settings archive saved liked graphql web static bundles').split(' '));
 
-  var found = new Map();          // username -> text|null
+  var found = new Map();          // username -> {name, text}
   var kind = guessKind();
+
+  // Button labels and list chrome that must never be mistaken for a person's name.
+  var CHROME = new Set(('follow following followers requested remove message removed ' +
+    'unfollow verified suggested for you new close cancel confirm follow back').split(' '));
 
   function guessKind() {
     var p = location.pathname;
@@ -28,6 +32,8 @@
     var h = d && d.textContent ? d.textContent.slice(0, 200).toLowerCase() : '';
     if (/\bviewer/.test(h)) return 'story_viewers';
     if (/\bcomment/.test(h)) return 'post_comments';
+    if (/\bfollowers\b|\bfollowing\b/.test(h)) return 'profile_list';
+    if (/\/followers|\/following/.test(p)) return 'profile_list';
     return 'post_likes';
   }
 
@@ -53,6 +59,27 @@
     return t ? t.slice(0, 500) : null;
   }
 
+  /**
+   * The display name shown beside the username. The export contains no display
+   * names at all, and Instagram names DM thread folders after them, so this is
+   * the only way to connect a conversation to the person it is with.
+   */
+  function nameNear(a, username) {
+    var row = a.closest('li') || a.parentElement;
+    for (var i = 0; i < 4 && row && (row.innerText || '').trim().length < 2; i++) row = row.parentElement;
+    if (!row) return null;
+    var lines = (row.innerText || '').split('\n').map(function (l) { return l.trim(); });
+    for (var j = 0; j < lines.length; j++) {
+      var line = lines[j];
+      if (!line || line.length > 60) continue;
+      var low = line.toLowerCase();
+      if (low === username || CHROME.has(low)) continue;
+      if (/^\d+$/.test(line)) continue;
+      return line;
+    }
+    return null;
+  }
+
   function scan() {
     // Prefer the open dialog so page chrome and suggestion rails are excluded.
     var scope = document.querySelector('[role="dialog"]') || document.body;
@@ -61,9 +88,13 @@
       var a = links[i];
       var name = usernameFromHref(a.getAttribute('href'));
       if (!name) continue;
-      var prev = found.get(name);
+      var prev = found.get(name) || { name: null, text: null };
+      var display = nameNear(a, name);
       var text = kind === 'post_comments' ? textNear(a, name) : null;
-      if (prev === undefined || (prev === null && text)) found.set(name, text);
+      found.set(name, {
+        name: prev.name || display,
+        text: prev.text || text,
+      });
     }
     render();
   }
@@ -85,11 +116,13 @@
     '<div style="font-weight:600;margin-bottom:2px">Instagram Tracker</div>' +
     '<div id="igt-n" style="font-size:22px;font-weight:600;letter-spacing:-.02em">0</div>' +
     '<div style="color:#c3c2b7;font-size:12px;margin-bottom:9px">usernames captured</div>' +
+    '<div id="igt-names" style="color:#898781;font-size:11px;margin:-6px 0 9px">0 with display names</div>' +
     '<select id="igt-k" style="width:100%;margin-bottom:8px;padding:5px;border-radius:7px;' +
       'background:#0d0d0d;color:#fff;border:1px solid rgba(255,255,255,.2);font:inherit">' +
       '<option value="post_likes">Likes on my post</option>' +
       '<option value="post_comments">Comments on my post</option>' +
-      '<option value="story_viewers">Story viewers</option></select>' +
+      '<option value="story_viewers">Story viewers</option>' +
+      '<option value="profile_list">Followers / following list</option></select>' +
     '<div style="color:#898781;font-size:11px;margin-bottom:9px">' +
       'Scroll the list to the bottom yourself — this only watches, it never scrolls or ' +
       'loads anything.</div>' +
@@ -104,11 +137,19 @@
   kEl.value = kind;
   kEl.addEventListener('change', function () { kind = kEl.value; found.clear(); scan(); });
 
-  function render() { nEl.textContent = String(found.size); }
+  var namesEl = box.querySelector('#igt-names');
+  function render() {
+    nEl.textContent = String(found.size);
+    var withNames = 0;
+    found.forEach(function (v) { if (v.name) withNames++; });
+    namesEl.textContent = withNames + ' with display names';
+  }
 
   box.querySelector('#igt-save').addEventListener('click', function () {
     var items = [];
-    found.forEach(function (text, username) { items.push({ username: username, text: text }); });
+    found.forEach(function (v, username) {
+      items.push({ username: username, name: v.name, text: v.text });
+    });
     var payload = {
       v: 1, kind: kind, permalink: location.href.split('?')[0],
       capturedAt: Math.floor(Date.now() / 1000), items: items,

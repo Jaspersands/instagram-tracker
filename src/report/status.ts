@@ -10,6 +10,8 @@ export interface Status {
   impressions: number;
   activity: number;
   captures: number;
+  dmThreads: number;
+  dmLinked: number;
   unfollowers: number;
   warnings: string[];
 }
@@ -36,6 +38,20 @@ export function status(db: Db, now: number): Status {
     : null;
 
   const captures = n('inbound_capture');
+
+  // A DM thread folder is named after the display name, which the export omits,
+  // so most threads start life unlinked to the follow graph.
+  const dmThreads = (db.prepare(
+    `SELECT COUNT(DISTINCT account_id) AS c FROM interaction WHERE kind = 'dm'`,
+  ).get() as { c: number }).c;
+  const dmLinked = (db.prepare(
+    `SELECT COUNT(DISTINCT COALESCE(a.merged_into, a.id)) AS c
+       FROM interaction i JOIN account a ON a.id = i.account_id
+      WHERE i.kind = 'dm'
+        AND (a.merged_into IS NOT NULL
+             OR EXISTS (SELECT 1 FROM follow_edge f WHERE f.account_id = a.id))`,
+  ).get() as { c: number }).c;
+
   const warnings: string[] = [];
 
   if (snapshots === 0) {
@@ -53,12 +69,19 @@ export function status(db: Db, now: number): Status {
     if (captures === 0) {
       warnings.push('No inbound captures yet — who engages with you is unmeasured. See /bookmarklet.');
     }
+    if (dmThreads > 0 && dmLinked < dmThreads) {
+      warnings.push(
+        `${dmThreads - dmLinked} of ${dmThreads} DM threads are not linked to a profile. ` +
+        'Instagram names thread folders after display names, which the export omits — ' +
+        'capture your followers list with the bookmarklet to connect them.');
+    }
   }
 
   return {
     snapshots, lastExport, daysSinceExport, followers,
     accounts: n('account'), interactions: n('interaction'),
     impressions: n('impression'), activity: n('activity'), captures,
+    dmThreads, dmLinked,
     unfollowers: (db.prepare(
       "SELECT COUNT(*) AS c FROM graph_event WHERE kind = 'lost_follower'",
     ).get() as { c: number }).c,
@@ -79,6 +102,7 @@ export function formatStatus(s: Status): string {
     ['posts seen', String(s.impressions)],
     ['unattributed acts', String(s.activity)],
     ['inbound captures', String(s.captures)],
+    ['DM threads linked', `${s.dmLinked} of ${s.dmThreads}`],
   ];
   const out = rows.map(([k, v]) => `  ${k.padEnd(18)} ${v}`);
   if (s.warnings.length) out.push('', ...s.warnings.map((w) => `  ! ${w}`));
