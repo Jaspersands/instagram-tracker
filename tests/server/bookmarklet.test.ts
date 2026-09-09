@@ -28,6 +28,25 @@ describe('capture.js safety contract', () => {
   it('does observe the DOM, which is how it works at all', () => {
     expect(code).toMatch(/MutationObserver/);
   });
+
+  it('never calls innerText, which forces a synchronous layout', () => {
+    // A MutationObserver calling innerText on a page that mutates as often as
+    // Instagram is a reflow storm — it froze the tab outright. Text is read
+    // with a TreeWalker instead.
+    expect(code).not.toMatch(/\.innerText/);
+    expect(code).toMatch(/createTreeWalker/);
+  });
+
+  it('coalesces mutations instead of scanning on every one', () => {
+    // Instagram fires mutations in bursts; one scan each meant thousands per
+    // second. The observer must schedule rather than scan directly.
+    expect(code).toMatch(/new MutationObserver\(schedule\)/);
+    expect(code).toMatch(/pending/);
+  });
+
+  it('skips rows it has already fully captured', () => {
+    expect(code).toMatch(/if \(prev && prev\.name/);
+  });
 });
 
 describe('/bookmarklet', () => {
