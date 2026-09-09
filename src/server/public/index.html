@@ -31,6 +31,21 @@ body {
   font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
 }
 header { padding:20px 24px 0; }
+.hrow { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
+button.primary {
+  background:var(--s1); color:#fff; border:0; border-radius:9px; padding:9px 16px;
+  font:inherit; font-weight:600; cursor:pointer; white-space:nowrap;
+}
+button.primary:disabled { opacity:.55; cursor:progress; }
+button.primary:hover:not(:disabled) { filter:brightness(1.08); }
+#banner {
+  margin-top:12px; padding:10px 14px; border-radius:9px; font-size:13px;
+  background:var(--surface); border:1px solid var(--border); color:var(--ink-2);
+}
+#banner.good { border-color:var(--good); }
+#banner.bad  { border-color:var(--crit); color:var(--crit); }
+#banner b { color:var(--ink); }
+#banner .dim { color:var(--muted); }
 h1 { font-size:19px; margin:0 0 2px; letter-spacing:-0.01em; }
 .sub { color:var(--muted); font-size:13px; margin:0; }
 nav { display:flex; gap:2px; padding:16px 24px 0; flex-wrap:wrap; border-bottom:1px solid var(--border); }
@@ -99,8 +114,14 @@ svg { display:block; max-width:100%; }
 </head>
 <body>
 <header>
-  <h1>Instagram Tracker</h1>
-  <p class="sub" id="sub">loading…</p>
+  <div class="hrow">
+    <div>
+      <h1>Instagram Tracker</h1>
+      <p class="sub" id="sub">loading…</p>
+    </div>
+    <button class="primary" id="refresh">Pull new data</button>
+  </div>
+  <div id="banner" hidden></div>
 </header>
 
 <nav id="tabs"></nav>
@@ -568,7 +589,7 @@ async function loadDecay() {
   ], d, { sort: 'daysSilent', empty: 'No quiet mutuals in this window.' });
 }
 
-(async function init() {
+async function loadAll() {
   const [ov, ppl, unf, lurk, hab, tst] = await Promise.all([
     get('/api/overview'), get('/api/people'), get('/api/unfollowers'),
     get('/api/lurkers'), get('/api/habits'), get('/api/taste'),
@@ -628,7 +649,70 @@ async function loadDecay() {
   table('#saved', [
     { k: 'username', t: 'username', asc: true }, { k: 'n', t: 'saved posts', num: true },
   ], tst.savedAuthors, { sort: 'n', empty: 'No saved posts in this export.' });
-})();
+
+  // Tabs that fetch their own data need re-running if one is open.
+  if (current === 'inbound') await loadInbound();
+  if (current === 'habits') { heatmap('#heat', hab.heatmap); barChart('#months', hab.byMonth); }
+}
+
+// ---- pull new data on demand ----
+function showBanner(html, cls) {
+  const b = $('#banner');
+  b.className = cls || '';
+  b.innerHTML = html;
+  b.hidden = false;
+}
+
+function describeRefresh(r) {
+  const ingested = r.archives.filter((a) => !a.skipped);
+  const caps = r.captures.filter((c) => !c.skipped && c.rows > 0);
+
+  if (r.found === 0) {
+    return [
+      '<b>Nothing found yet.</b> Request an export in the Instagram app — ' +
+      'Settings → Accounts Center → Your information and permissions → ' +
+      'Download your information → All available information, JSON, All time.',
+      `<div class="dim" style="margin-top:6px">Watching: ${r.scanned.join(' · ')}</div>`,
+    ].join('');
+  }
+  if (!ingested.length && !caps.length) {
+    return `<b>Up to date.</b> <span class="dim">Nothing new in ${r.scanned.length} folder(s). ` +
+           `${r.archives.length} export(s) and ${r.captures.length} capture(s) already ingested.</span>`;
+  }
+
+  const bits = [];
+  for (const a of ingested) {
+    bits.push(`<b>${a.name}</b>: +${a.gained} follower${a.gained === 1 ? '' : 's'}` +
+              (a.lost.length ? `, <b>${a.lost.length} unfollower${a.lost.length === 1 ? '' : 's'}</b>` : ''));
+  }
+  for (const c of caps) bits.push(`<b>${c.name}</b>: ${c.rows} inbound rows`);
+  if (r.newUnfollowers.length) {
+    bits.push(`<span class="dim">Left you: ${r.newUnfollowers.join(', ')}</span>`);
+  }
+  return bits.join('<br>');
+}
+
+$('#refresh').onclick = async () => {
+  const b = $('#refresh');
+  b.disabled = true;
+  b.textContent = 'Checking…';
+  showBanner('<span class="dim">Scanning your folders…</span>');
+  try {
+    const res = await fetch('/api/refresh', { method: 'POST' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    const r = await res.json();
+    const anyNew = r.archives.some((a) => !a.skipped) || r.captures.some((c) => !c.skipped && c.rows);
+    showBanner(describeRefresh(r), anyNew ? 'good' : '');
+    await loadAll();
+  } catch (e) {
+    showBanner('<b>Refresh failed.</b> ' + String(e && e.message ? e.message : e), 'bad');
+  } finally {
+    b.disabled = false;
+    b.textContent = 'Pull new data';
+  }
+};
+
+loadAll();
 </script>
 </body>
 </html>

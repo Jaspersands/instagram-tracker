@@ -8,6 +8,10 @@ import { watchFolder } from '../watch/watcher.js';
 import { buildServer } from '../server/server.js';
 import { status, formatStatus } from '../report/status.js';
 import { notify, unfollowerMessage } from '../notify/notify.js';
+import { candidateDirs, findInputs } from '../auto/discover.js';
+import { refreshAll } from '../auto/refresh.js';
+import { proposeRegistry } from '../archive/inventory.js';
+import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 const [cmd, ...args] = process.argv.slice(2);
@@ -16,13 +20,31 @@ const date = (t: number | null) => (t === null ? '—' : new Date(t * 1000).toIS
 
 switch (cmd) {
   case 'inventory': {
-    if (!args[0]) { console.error('usage: inventory <archive.zip>'); process.exit(1); }
-    console.log(formatInventory(await inventory(args[0])));
+    // No path given: find the newest export yourself rather than making the
+    // user go looking for it.
+    let target = args[0];
+    if (!target) {
+      const { archives } = findInputs();
+      if (!archives.length) {
+        console.error('No Instagram export found in: ' + candidateDirs().join(', '));
+        console.error('Request one from the app, or pass a path explicitly.');
+        process.exit(1);
+      }
+      target = archives[0].path;
+      console.log(`using ${target}\n`);
+    }
+    const rows = await inventory(target);
+    console.log(formatInventory(rows));
+    console.log('\n' + proposeRegistry(rows));
     break;
   }
 
   case 'ingest': {
-    if (!args[0]) { console.error('usage: ingest <archive.zip | ig-capture-*.json>'); process.exit(1); }
+    if (!args[0]) {
+      console.error('usage: ingest <archive.zip | ig-capture-*.json>');
+      console.error('  (or run `npm run auto` to find and ingest everything automatically)');
+      process.exit(1);
+    }
     const db = openDb(DB_PATH);
 
     // Accept bookmarklet captures here too, not only through the watcher.
@@ -60,6 +82,50 @@ switch (cmd) {
     break;
   }
 
+  case 'auto': {
+    const db = openDb(DB_PATH);
+    const dirs = args.length ? args : candidateDirs();
+    console.log(`scanning: ${dirs.join(', ')}`);
+
+    const r = await refreshAll(db, dirs);
+    if (r.found === 0) {
+      console.log('\nNothing found yet. Request an export from the Instagram app —');
+      console.log('Settings > Accounts Center > Your information and permissions >');
+      console.log('Download your information > All available information, JSON, All time.');
+      break;
+    }
+
+    for (const a of r.archives) {
+      console.log(a.skipped
+        ? `  = ${a.name} (already ingested)`
+        : `  + ${a.name}: +${a.gained} followers, -${a.lost.length}`);
+    }
+    for (const c of r.captures) {
+      console.log(`  + ${c.name}: ${c.skipped ? 'invalid' : c.rows + ' inbound rows'}`);
+    }
+
+    const msg = unfollowerMessage(r.newUnfollowers);
+    if (msg) notify('Instagram Tracker', msg);
+
+    console.log('\n' + formatStatus(status(db, now())));
+    break;
+  }
+
+  case 'install-agent': {
+    console.log(installAgent(candidateDirs(), DB_PATH));
+    break;
+  }
+
+  case 'uninstall-agent': {
+    console.log(uninstallAgent());
+    break;
+  }
+
+  case 'agent-status': {
+    console.log(agentStatus());
+    break;
+  }
+
   case 'status': {
     console.log(formatStatus(status(openDb(DB_PATH), now())));
     break;
@@ -75,11 +141,12 @@ switch (cmd) {
   }
 
   case 'watch': {
-    const dir = args[0];
-    if (!dir) { console.error('usage: watch <folder>'); process.exit(1); }
+    // No folders given: watch everywhere an export or capture plausibly lands.
+    const dirs = args.length ? args : candidateDirs();
+    if (!dirs.length) { console.error('usage: watch <folder...>'); process.exit(1); }
     const db = openDb(DB_PATH);
-    console.log(`watching ${dir} for exports…`);
-    await watchFolder(db, dir, ({ zipPath, lost, captured }) => {
+    console.log(`watching for exports and captures:\n  ${dirs.join('\n  ')}`);
+    await watchFolder(db, dirs, ({ zipPath, lost, captured }) => {
       console.log(`ingested ${zipPath}`);
       if (captured !== undefined) console.log(`  ${captured} inbound row(s) captured`);
       if (lost.length) {
@@ -93,6 +160,18 @@ switch (cmd) {
 
   default:
     console.error(`unknown command: ${cmd ?? '(none)'}`);
-    console.error('commands: status | inventory <zip> | ingest <zip|capture.json> | report [unfollowers|lurkers] | serve | watch <dir>');
+    console.error([
+      'commands:',
+      '  auto                     find and ingest everything, then show status',
+      '  status                   where things stand',
+      '  inventory [zip]          what is in an archive (finds the newest if omitted)',
+      '  ingest <zip|capture>     ingest one file',
+      '  report [unfollowers|lurkers]',
+      '  serve                    dashboard on 127.0.0.1',
+      '  watch <dir...>           ingest anything that lands, forever',
+      '  install-agent            run the watcher at login, permanently',
+      '  uninstall-agent          stop and remove it',
+      '  agent-status             is the background agent running?',
+    ].join('\n'));
     process.exit(1);
 }

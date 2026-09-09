@@ -13,7 +13,11 @@
     "report": "tsx src/cli/index.ts report",
     "watch": "tsx src/cli/index.ts watch",
     "serve": "tsx src/cli/index.ts serve",
-    "status": "tsx src/cli/index.ts status"
+    "status": "tsx src/cli/index.ts status",
+    "auto": "tsx src/cli/index.ts auto",
+    "install-agent": "tsx src/cli/index.ts install-agent",
+    "uninstall-agent": "tsx src/cli/index.ts uninstall-agent",
+    "agent-status": "tsx src/cli/index.ts agent-status"
   },
   "keywords": [],
   "author": "",
