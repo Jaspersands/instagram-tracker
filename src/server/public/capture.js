@@ -32,7 +32,9 @@
    * and a half-scrolled capture would make every unseen liker look like a ghost.
    */
   function expectedTotal() {
-    var text = document.body.innerText || '';
+    // textContent, not innerText: the regex works the same and this does not
+    // force a full-page layout on a very large document.
+    var text = document.body.textContent || '';
     var m = /and\s+([\d,]+)\s+others?/i.exec(text);
     if (m) return parseInt(m[1].replace(/,/g, ''), 10) + 1;
     m = /([\d,]+)\s+likes?/i.exec(text);
@@ -65,12 +67,31 @@
     } catch (e) { return null; }
   }
 
+  /**
+   * Text lines of a row, read without forcing layout.
+   *
+   * innerText makes the browser compute layout synchronously. Called from a
+   * MutationObserver on a page that mutates as constantly as Instagram does,
+   * that is a reflow storm: it froze the tab outright. A TreeWalker over text
+   * nodes gives the same lines for free.
+   */
+  function rowLines(row) {
+    var out = [];
+    var w = document.createTreeWalker(row, NodeFilter.SHOW_TEXT, null);
+    var n;
+    while ((n = w.nextNode())) {
+      var t = (n.nodeValue || '').trim();
+      if (t) out.push(t);
+    }
+    return out;
+  }
+
   // Best-effort comment text: the row's visible text minus the username itself.
   function textNear(a, username) {
     var row = a.closest('li') || a.parentElement;
-    for (var i = 0; i < 3 && row && (row.innerText || '').trim().length < 2; i++) row = row.parentElement;
+    for (var i = 0; i < 3 && row && rowLines(row).length < 2; i++) row = row.parentElement;
     if (!row) return null;
-    var t = (row.innerText || '').replace(/\s+/g, ' ').trim();
+    var t = rowLines(row).join(' ').replace(/\s+/g, ' ').trim();
     if (t.toLowerCase().indexOf(username) === 0) t = t.slice(username.length).trim();
     t = t.replace(/^[·•\-–—\s]+/, '').trim();
     return t ? t.slice(0, 500) : null;
@@ -83,9 +104,9 @@
    */
   function nameNear(a, username) {
     var row = a.closest('li') || a.parentElement;
-    for (var i = 0; i < 4 && row && (row.innerText || '').trim().length < 2; i++) row = row.parentElement;
+    for (var i = 0; i < 4 && row && rowLines(row).length < 2; i++) row = row.parentElement;
     if (!row) return null;
-    var lines = (row.innerText || '').split('\n').map(function (l) { return l.trim(); });
+    var lines = rowLines(row);
     for (var j = 0; j < lines.length; j++) {
       var line = lines[j];
       if (!line || line.length > 60) continue;
@@ -105,19 +126,49 @@
       var a = links[i];
       var name = usernameFromHref(a.getAttribute('href'));
       if (!name) continue;
-      var prev = found.get(name) || { name: null, text: null };
+      var prev = found.get(name);
+      // Already have everything for this row: skip the DOM walk entirely.
+      if (prev && prev.name && (kind !== 'post_comments' || prev.text)) continue;
       var display = nameNear(a, name);
       var text = kind === 'post_comments' ? textNear(a, name) : null;
       found.set(name, {
-        name: prev.name || display,
-        text: prev.text || text,
+        name: (prev && prev.name) || display,
+        text: (prev && prev.text) || text,
       });
     }
     render();
   }
 
-  var obs = new MutationObserver(scan);
+  /**
+   * Coalesce to one scan per animation frame. Scanning on every mutation was a
+   * reflow storm that locked the tab; a fixed 250ms timer fixed that but then
+   * lost rows, because fast scrolling recycles them faster than the timer
+   * fires. A frame is short enough that no row can appear and vanish between
+   * scans, and — now that scanning walks text nodes and skips rows already
+   * captured — cheap enough to afford every frame.
+   */
+  var pending = false;
+  var raf = window.requestAnimationFrame || function (fn) { return setTimeout(fn, 16); };
+  function schedule() {
+    if (pending) return;
+    pending = true;
+    raf(function () { pending = false; scan(); });
+  }
+
+  var obs = new MutationObserver(schedule);
   obs.observe(document.body, { childList: true, subtree: true });
+
+  // Scrolling can move a virtualised list without mutating anything the
+  // observer is watching, so trigger on scroll as well.
+  document.addEventListener('scroll', schedule, true);
+
+  // Safety net: requestAnimationFrame is suspended in a background tab, so a
+  // scan queued just before you switch away would never run. Measured against a
+  // 1000-row virtualised list with only this net active, a 1s period let rows
+  // slip past between scans; 400ms did not, and scan is cheap because it skips
+  // rows already captured. rAF remains the primary path whenever the tab is
+  // visible, which is whenever you are actually scrolling.
+  setInterval(scan, 400);
 
   // ---- panel ----
   var box = document.createElement('div');
