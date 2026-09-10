@@ -11,6 +11,14 @@ export function isMessageFile(path: string): boolean {
  * thread id, and everything before it is the username — which may itself contain
  * underscores, so only the final numeric segment is stripped.
  */
+/** The numeric thread id from a folder like inbox/marcus_612189326440592. */
+export function threadIdFromPath(threadPath: string | null): string | null {
+  if (!threadPath) return null;
+  const last = threadPath.split('/').pop() ?? '';
+  const m = /_(\d{6,})$/.exec(last);
+  return m ? m[1] : null;
+}
+
 export function usernameFromThreadPath(
   threadPath: string | null,
   title: string | null,
@@ -44,6 +52,15 @@ export function parseMessageThread(json: unknown, sink: RowSink): number {
   const threadPath = typeof t.thread_path === 'string' ? t.thread_path : null;
   const username = usernameFromThreadPath(threadPath, title);
   if (!username) return 0;
+
+  const threadId = threadIdFromPath(threadPath);
+  if (threadId) {
+    sink.dmThread({
+      threadId,
+      folderName: (threadPath ?? '').split('/').pop() ?? null,
+      placeholder: username,
+    });
+  }
 
   // In a 1:1 thread the counterpart is whoever matches the title; anyone else is me.
   const counterpartName = title ?? null;

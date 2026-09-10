@@ -251,15 +251,10 @@ export function inbound(db: Db, now: number) {
        FROM inbound_capture c ORDER BY c.captured_at DESC`,
   ).all() as { id: number; kind: string; permalink: string | null; capturedAt: number; people: number }[];
 
-  // With nothing captured, "has never engaged" is unknown rather than true.
-  // Accusing every follower of being a ghost would be the worst possible default.
-  if (captures.length === 0) {
-    return { captures: [], ghosts: [], superfans: [], reciprocity: [] };
-  }
-
-  // The same reasoning applies to a list that was not scrolled to the end: its
-  // absences carry no information, so ghost detection needs at least one
-  // complete capture before it can claim anyone never engaged.
+  // Only ghost detection depends on capture completeness. Superfans and
+  // reciprocity are read off inbound interactions and are valid whatever their
+  // source — an imported comment list creates no capture row, and gating the
+  // whole report on captures silently returned nothing.
   const completeCaptures = (db.prepare(
     'SELECT COUNT(*) AS c FROM inbound_capture WHERE complete = 1',
   ).get() as { c: number }).c;

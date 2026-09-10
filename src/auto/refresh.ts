@@ -2,7 +2,7 @@ import { basename } from 'node:path';
 import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
-import { importLikersCsv } from '../ingest/likers.js';
+import { importApiCsv } from '../ingest/apiCsv.js';
 import { candidateDirs, findInputs } from './discover.js';
 import { localCopyOf, needsStaging } from './staging.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
@@ -12,7 +12,7 @@ export interface RefreshResult {
   found: number;
   archives: { name: string; skipped: boolean; staged: boolean; gained: number; lost: string[] }[];
   captures: { name: string; skipped: boolean; rows: number }[];
-  likers: { name: string; posts: number; likeEvents: number; people: number }[];
+  likers: { name: string; kind: string; summary: string }[];
   newUnfollowers: string[];
   linked: number;
 }
@@ -51,9 +51,8 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
 
   for (const l of likers) {
     try {
-      const s = importLikersCsv(db, localCopyOf(l.path));
-      result.likers.push({ name: basename(l.path), posts: s.posts,
-                           likeEvents: s.likeEvents, people: s.people });
+      const r = importApiCsv(db, localCopyOf(l.path));
+      result.likers.push({ name: basename(l.path), kind: r.kind, summary: r.summary });
     } catch (err) {
       console.error(`failed to import ${l.path}:`, err);
     }

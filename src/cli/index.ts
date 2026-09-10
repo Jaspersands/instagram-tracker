@@ -12,8 +12,8 @@ import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 import { candidateDirs, findInputs } from '../auto/discover.js';
 import { refreshAll } from '../auto/refresh.js';
 import { localCopyOf, needsStaging } from '../auto/staging.js';
-import { importLikersCsv } from '../ingest/likers.js';
-import { isLikersCsv } from '../auto/discover.js';
+import { importApiCsv } from '../ingest/apiCsv.js';
+import { isApiCsv } from '../auto/discover.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 
@@ -56,13 +56,11 @@ switch (cmd) {
     }
     const db = openDb(DB_PATH);
 
-    if (isLikersCsv(args[0].split('/').pop() ?? '')) {
-      const s = importLikersCsv(db, args[0]);
-      console.log(`${s.posts} posts · ${s.likeEvents} new like events · ${s.people} people`);
-      console.log(`  ${s.displayNames} display names · ${s.instagramIds} Instagram ids`);
-      console.log(`  ${s.completePosts} complete lists, ${s.partialPosts} partial`);
+    if (/\.csv$/i.test(args[0])) {
+      const r = importApiCsv(db, args[0]);
+      console.log(`${r.kind}: ${r.summary}`);
       const linked = applyIdentities(db, resolveIdentities(db));
-      if (linked) console.log(`  ${linked} DM thread(s) linked to a profile`);
+      if (linked) console.log(`  ${linked} DM thread(s) linked by display name`);
       break;
     }
 
