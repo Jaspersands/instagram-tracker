@@ -57,6 +57,9 @@ export function installAgent(watchDirs: string[], dbPath: string): string {
     'It starts at login and restarts if it dies. Exports and captures dropped into',
     'those folders are ingested with no command typed, and you get a notification',
     'naming anyone who unfollowed you. Remove it with: npm run uninstall-agent',
+    '',
+    'The agent loads the source once at launch, so after changing any code run',
+    'npm run restart-agent -- otherwise it keeps serving the old version.',
   ].join('\n');
 }
 
