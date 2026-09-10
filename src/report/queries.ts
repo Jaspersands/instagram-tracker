@@ -138,6 +138,24 @@ export function overview(db: Db) {
   };
 }
 
+/**
+ * How many of your own posts a per-post API pull would have to visit.
+ *
+ * Not `COUNT(*) FROM my_post`: that table also holds every story ever posted —
+ * 2,854 of them here against 47 real posts — which turned a four-minute
+ * estimate into "218 min" and would have talked anyone out of running it.
+ * Stories are not addressable by media_likers or media_comments anyway.
+ */
+export function postCount(db: Db): number {
+  const r = db.prepare(
+    `SELECT (SELECT COUNT(DISTINCT permalink) FROM my_post WHERE permalink IS NOT NULL) AS withUrl,
+            (SELECT COUNT(*) FROM my_post WHERE media_type <> 'story') AS notStories`,
+  ).get() as { withUrl: number; notStories: number };
+  // A permalink is the reliable signal, but the export's own post records carry
+  // none, so fall back to whatever is not a story.
+  return r.withUrl || r.notStories;
+}
+
 export function decay(db: Db, now: number, days: number) {
   const cutoff = now - days * 86400;
   const latest = latestSnapshotId(db);
@@ -261,17 +279,24 @@ export function inbound(db: Db, now: number) {
 
   const latest = latestSnapshotId(db);
 
+  // The engaged set is built once in a CTE rather than re-derived per follower.
+  // As a correlated NOT EXISTS, COALESCE(merged_into, id) = a.id could use no
+  // index and rescanned all 109k interactions for each of 1,115 followers —
+  // 6.7 seconds for this one query, which blocked the whole dashboard. Hoisting
+  // it out gives the same answer in 6ms.
   const ghosts = (latest === null || completeCaptures === 0) ? [] : (db.prepare(
-    `SELECT a.username AS username, f.since AS followedSince
+    `WITH engaged(id) AS (
+       SELECT DISTINCT COALESCE(a2.merged_into, a2.id)
+         FROM interaction i
+         JOIN account a2 ON a2.id = i.account_id
+        WHERE i.direction = 'in'
+     )
+     SELECT a.username AS username, f.since AS followedSince
        FROM account a
        JOIN follow_edge f ON f.account_id = a.id
         AND f.direction = 'follows_me' AND f.snapshot_id = ?
       WHERE a.merged_into IS NULL
-        AND NOT EXISTS (
-              SELECT 1 FROM interaction i
-                JOIN account a2 ON a2.id = i.account_id
-               WHERE COALESCE(a2.merged_into, a2.id) = a.id
-                 AND i.direction = 'in')
+        AND a.id NOT IN (SELECT id FROM engaged)
       ORDER BY f.since ASC`,
   ).all(latest) as { username: string; followedSince: number | null }[]);
 
@@ -295,10 +320,12 @@ export function inbound(db: Db, now: number) {
     storyViews: number; total: number;
   }[];
 
+  // A Map, not .find(): 7,534 people against 200 superfans is 1.5M string
+  // comparisons for a lookup that should be constant time.
+  const byName = new Map(superfans.map((s) => [s.username, s.total]));
   const reciprocity = people(db, now)
     .map((p) => {
-      const sf = superfans.find((s) => s.username === p.username);
-      const theyGive = sf ? sf.total : 0;
+      const theyGive = byName.get(p.username) ?? 0;
       const youGive = p.likes + p.comments + p.storyLikes + p.saves + p.dmOut;
       return { username: p.username, youGive, theyGive, gap: youGive - theyGive };
     })

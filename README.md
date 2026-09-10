@@ -118,9 +118,20 @@ npm run serve
 Then visit **http://127.0.0.1:4317**. It binds to loopback only — it serves your DM
 history and full social graph and must never be reachable from the network.
 
-Tabs: Overview (stat tiles + follower trend) · People (the big sortable table,
-click any row for that person's full timeline) · Unfollowers · Lurk gap · Going
-quiet · Habits (activity heatmap + monthly volume) · Taste.
+Five sections, in the order the questions come up:
+
+- **Today** — the answer first: counts, who left, who is closest, the follower
+  trend. Every tile is a link into the section that explains it.
+- **People** — one searchable directory of everyone. Click a row for that
+  person's full timeline. A column that is empty for *everyone* is hidden and
+  the reason printed, rather than repeating a misleading zero 7,000 times.
+- **Connections** — who engages with you, and who is drifting: superfans,
+  reciprocity, followers who never engage, quiet mutuals, and accounts you watch
+  constantly without reacting.
+- **You** — when you are active, how much you use Instagram, and what its own
+  model thinks you like.
+- **Data** — pull from Instagram, check folders, and an honest inventory of
+  what is in the database and what is missing *and why*.
 
 Or from the terminal:
 
@@ -198,18 +209,42 @@ cannot quietly break them.
 This unlocks the **Inbound** tab: superfans, measured ghost followers (follow you
 but appear in none of your captures), and reciprocity.
 
-## Importing per-post liker lists
+## Pulling what the export leaves out
 
-`likers.py` (instagrapi, session id, 3-6s pacing) writes
-`all_instagram_likers.csv`: one row per like, per post, with the liker's
-username, display name and numeric Instagram id. Import it with:
+Some things are simply absent from the export at every account tier: who liked
+your posts, who commented on them, and which real account is behind each DM
+thread. Those come from Instagram's private API, and the **Data** tab runs it for
+you — tick what you want, paste your session id, press Start pull. Progress
+streams while it runs and the results import themselves.
+
+`scrape.py` is the script behind the button and runs standalone too:
 
 ```bash
-npm run ingest -- all_instagram_likers.csv
+echo "$SESSIONID" | python3 scrape.py --jobs threads,likers,comments --out data/pulls
 ```
 
-or drop it in a watched folder. Three columns each solve a different problem the
-export could not:
+**How the credential is handled.** The session id is a password. It goes to the
+child process on **stdin**, never as a command-line argument — a command line is
+readable by every process running as you via `ps`. It is never written to disk,
+never logged, never stored in the browser, never put in a URL, and it is scrubbed
+out of error text on both sides before anything is printed. The field is cleared
+the moment the pull starts. `tests/scrape/run.test.ts` and
+`tests/server/pull.test.ts` enforce each of those.
+
+Pacing is 3–6 seconds between requests and only one pull runs at a time; two
+passes at once double the request rate, which is what actually gets accounts
+actioned. Nothing here is wired into the background agent — pressing the button
+stays a deliberate act. See [docs/api-imports.md](docs/api-imports.md).
+
+Requires `instagrapi` (`pip3 install instagrapi`). The dashboard checks for it and
+tells you which of the two possible problems you have, since "no python" and "no
+library" have different fixes.
+
+### What the liker list is worth
+
+A liker CSV carries one row per like, per post, with the liker's username,
+display name and numeric Instagram id. Three columns each solve a different
+problem the export could not:
 
 - **username x post** gives real inbound engagement: superfans, engagement decay,
   and ghost followers measured rather than inferred.

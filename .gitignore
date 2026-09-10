@@ -12,6 +12,13 @@ data/
 *likers*.csv
 all_instagram_likers.csv
 *_likers.csv
+# Everything the API pull writes. These name thread participants and
+# commenters, so the patterns are explicit rather than relying on data/ alone.
+data/pulls/
+threads.csv
+comments.csv
+dm_threads.csv
+post_comments.csv
 
 # Raw Instagram exports and bookmarklet captures
 exports/

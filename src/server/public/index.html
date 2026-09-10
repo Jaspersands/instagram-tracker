@@ -5,234 +5,439 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Instagram Tracker</title>
 <style>
+/* ---------------------------------------------------------------- tokens */
 :root {
   color-scheme: light;
-  --plane:#f9f9f7; --surface:#fcfcfb;
-  --ink:#0b0b0b; --ink-2:#52514e; --muted:#898781;
-  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,0.10);
-  --s1:#2a78d6; --s2:#eb6834;
-  --good:#006300; --crit:#d03b3b;
-  --cell0:#f2f1ec;
+  --plane:#f7f7f5; --surface:#ffffff; --sunk:#f1f0ec;
+  --ink:#111110; --ink-2:#55544f; --muted:#8a8880;
+  --line:#e5e4dd; --line-2:#d6d5cc;
+  --grid:#e8e7e0; --axis:#c3c2b7;
+  --s1:#2a78d6; --s1-soft:#eaf1fc; --s2:#eb6834;
+  --ok:#1a7f37; --ok-soft:#e8f4ea;
+  --warn:#9a6700; --warn-soft:#fdf5e2;
+  --bad:#c9331f; --bad-soft:#fdeeeb;
+  --cell0:#eeede8;
+  --shadow-1:0 1px 2px rgba(17,17,16,.05), 0 1px 1px rgba(17,17,16,.03);
+  --shadow-2:0 8px 28px rgba(17,17,16,.10), 0 2px 6px rgba(17,17,16,.05);
+  --r1:8px; --r2:12px; --r3:16px;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --plane:#0d0d0d; --surface:#1a1a19;
-    --ink:#ffffff; --ink-2:#c3c2b7; --muted:#898781;
-    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,0.10);
-    --s1:#3987e5; --s2:#d95926;
-    --good:#0ca30c; --crit:#d03b3b;
-    --cell0:#232322;
+    --plane:#0c0c0b; --surface:#181817; --sunk:#111110;
+    --ink:#f7f7f5; --ink-2:#bfbeb6; --muted:#8a8880;
+    --line:#2a2a27; --line-2:#37372f;
+    --grid:#262624; --axis:#3a3a36;
+    --s1:#4a94ec; --s1-soft:#14243a; --s2:#e5703f;
+    --ok:#3fb950; --ok-soft:#13251a;
+    --warn:#d29922; --warn-soft:#26200f;
+    --bad:#f0563d; --bad-soft:#2a1512;
+    --cell0:#1f1f1d;
+    --shadow-1:0 1px 2px rgba(0,0,0,.4);
+    --shadow-2:0 10px 34px rgba(0,0,0,.55);
   }
 }
-* { box-sizing: border-box; }
+* { box-sizing:border-box; }
+html { -webkit-text-size-adjust:100%; }
 body {
   margin:0; background:var(--plane); color:var(--ink);
-  font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;
+  font:15px/1.55 ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif;
+  -webkit-font-smoothing:antialiased;
 }
-header { padding:20px 24px 0; }
-.hrow { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; }
-button.primary {
-  background:var(--s1); color:#fff; border:0; border-radius:9px; padding:9px 16px;
-  font:inherit; font-weight:600; cursor:pointer; white-space:nowrap;
+h1,h2,h3 { margin:0; letter-spacing:-0.015em; font-weight:600; }
+p { margin:0; }
+a { color:var(--s1); text-decoration:none; }
+a:hover { text-decoration:underline; }
+.num, .tnum { font-variant-numeric:tabular-nums; }
+
+/* ---------------------------------------------------------------- chrome */
+.topbar {
+  position:sticky; top:0; z-index:30; background:color-mix(in srgb, var(--plane) 88%, transparent);
+  backdrop-filter:blur(12px); border-bottom:1px solid var(--line);
 }
-button.primary:disabled { opacity:.55; cursor:progress; }
-button.primary:hover:not(:disabled) { filter:brightness(1.08); }
-#banner {
-  margin-top:12px; padding:10px 14px; border-radius:9px; font-size:13px;
-  background:var(--surface); border:1px solid var(--border); color:var(--ink-2);
+.topbar-in {
+  max-width:1180px; margin:0 auto; padding:14px 22px 0;
+  display:flex; align-items:baseline; gap:14px; flex-wrap:wrap;
 }
-#banner.good { border-color:var(--good); }
-#banner.bad  { border-color:var(--crit); color:var(--crit); }
-#banner b { color:var(--ink); }
-#banner .dim { color:var(--muted); }
-h1 { font-size:19px; margin:0 0 2px; letter-spacing:-0.01em; }
-.sub { color:var(--muted); font-size:13px; margin:0; }
-nav { display:flex; gap:2px; padding:16px 24px 0; flex-wrap:wrap; border-bottom:1px solid var(--border); }
+.brand { font-size:16px; font-weight:650; letter-spacing:-0.02em; }
+.brand span { color:var(--muted); font-weight:400; }
+.topbar-in .spacer { flex:1 1 auto; }
+nav {
+  max-width:1180px; margin:0 auto; padding:10px 22px 0;
+  display:flex; gap:4px; overflow-x:auto; scrollbar-width:none;
+}
+nav::-webkit-scrollbar { display:none; }
 nav button {
   background:none; border:0; border-bottom:2px solid transparent; color:var(--ink-2);
-  padding:8px 12px; font:inherit; cursor:pointer; border-radius:6px 6px 0 0;
+  padding:8px 12px 10px; font:inherit; font-size:14px; cursor:pointer; white-space:nowrap;
+  border-radius:var(--r1) var(--r1) 0 0;
 }
 nav button:hover { background:var(--surface); color:var(--ink); }
 nav button[aria-selected="true"] { color:var(--ink); border-bottom-color:var(--s1); font-weight:600; }
-main { padding:20px 24px 60px; }
+nav button .n { color:var(--muted); font-weight:400; font-size:12px; margin-left:5px; }
+main { max-width:1180px; margin:0 auto; padding:26px 22px 90px; }
 section[hidden] { display:none; }
+
+/* ---------------------------------------------------------------- buttons */
+button.btn, a.btn {
+  display:inline-flex; align-items:center; gap:7px; background:var(--surface); color:var(--ink);
+  border:1px solid var(--line-2); border-radius:var(--r1); padding:8px 14px;
+  font:inherit; font-size:14px; cursor:pointer; white-space:nowrap;
+}
+button.btn:hover:not(:disabled), a.btn:hover { background:var(--sunk); text-decoration:none; }
+button.btn.primary, a.btn.primary {
+  background:var(--s1); border-color:transparent; color:#fff; font-weight:600;
+}
+button.btn.primary:hover:not(:disabled) { filter:brightness(1.08); }
+button.btn.danger { color:var(--bad); border-color:var(--line-2); }
+button.btn:disabled { opacity:.5; cursor:not-allowed; }
+button.btn.sm { padding:5px 10px; font-size:13px; }
+
+/* ---------------------------------------------------------------- cards */
 .card {
-  background:var(--surface); border:1px solid var(--border);
-  border-radius:10px; padding:16px; margin-bottom:16px;
+  background:var(--surface); border:1px solid var(--line);
+  border-radius:var(--r2); padding:18px; margin-bottom:16px; box-shadow:var(--shadow-1);
 }
-.card h2 { font-size:14px; margin:0 0 2px; }
-.card p.note { color:var(--muted); font-size:12px; margin:0 0 14px; }
-.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:10px; margin-bottom:16px; }
-.tile { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:12px 14px; }
-.tile .v { font-size:24px; font-weight:600; letter-spacing:-0.02em; }
-.tile .k { color:var(--muted); font-size:12px; margin-top:1px; }
-.toolbar { display:flex; gap:8px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
-input[type=search], select {
-  background:var(--surface); color:var(--ink); border:1px solid var(--border);
-  border-radius:7px; padding:6px 10px; font:inherit; min-width:180px;
+.card > header { margin-bottom:14px; }
+.card h2 { font-size:15px; }
+.card h3 { font-size:14px; }
+.card .note { color:var(--muted); font-size:13px; margin-top:3px; }
+.card.flush { padding:0; overflow:hidden; }
+.card.flush > header { padding:18px 18px 0; margin-bottom:12px; }
+.card.flush > .scroll { border:0; border-radius:0; border-top:1px solid var(--line); }
+.grid2 { display:grid; grid-template-columns:repeat(auto-fit,minmax(320px,1fr)); gap:16px; align-items:start; }
+
+/* hero: the one answer-first block, deliberately heavier than everything else */
+.hero {
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r3);
+  padding:24px 26px; margin-bottom:18px; box-shadow:var(--shadow-1);
 }
-.scroll { overflow-x:auto; border:1px solid var(--border); border-radius:10px; background:var(--surface); }
-table { border-collapse:collapse; width:100%; font-size:13px; }
-th, td { padding:7px 10px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--grid); }
+.hero .lede { font-size:22px; line-height:1.35; letter-spacing:-0.02em; font-weight:500; }
+.hero .lede b { font-weight:680; }
+.hero .since { color:var(--muted); font-size:13px; margin-top:10px; }
+
+/* ---------------------------------------------------------------- tiles */
+.tiles { display:grid; grid-template-columns:repeat(auto-fit,minmax(148px,1fr)); gap:12px; margin-bottom:18px; }
+.tile {
+  background:var(--surface); border:1px solid var(--line); border-radius:var(--r2);
+  padding:14px 16px; text-align:left; font:inherit; color:inherit;
+  box-shadow:var(--shadow-1); display:block;
+}
+button.tile { cursor:pointer; }
+button.tile:hover { border-color:var(--s1); background:var(--s1-soft); }
+.tile .v { font-size:27px; font-weight:640; letter-spacing:-0.03em; line-height:1.15; font-variant-numeric:tabular-nums; }
+.tile .k { color:var(--muted); font-size:12.5px; margin-top:2px; }
+.tile .go { color:var(--s1); font-size:12px; margin-top:6px; opacity:0; transition:opacity .12s; }
+button.tile:hover .go { opacity:1; }
+.tile.bad .v { color:var(--bad); }
+
+/* ---------------------------------------------------------------- bits */
+.pill {
+  display:inline-block; background:var(--sunk); border:1px solid var(--line);
+  border-radius:999px; padding:3px 10px; font-size:12.5px; color:var(--ink-2);
+  margin:0 5px 5px 0;
+}
+.pill.k { color:var(--muted); }
+.pill.k b { color:var(--ink); font-variant-numeric:tabular-nums; }
+.tag { display:inline-block; border-radius:999px; padding:2px 9px; font-size:12px; font-weight:600; }
+.tag.ok   { background:var(--ok-soft);   color:var(--ok); }
+.tag.warn { background:var(--warn-soft); color:var(--warn); }
+.tag.bad  { background:var(--bad-soft);  color:var(--bad); }
+.tag.mute { background:var(--sunk); color:var(--muted); }
+.rel { font-size:12.5px; color:var(--ink-2); }
+.toolbar { display:flex; gap:9px; align-items:center; margin-bottom:12px; flex-wrap:wrap; }
+.toolbar .spacer { flex:1 1 auto; }
+.count { color:var(--muted); font-size:13px; font-variant-numeric:tabular-nums; }
+input[type=search], input[type=password], input[type=text], select {
+  background:var(--surface); color:var(--ink); border:1px solid var(--line-2);
+  border-radius:var(--r1); padding:8px 11px; font:inherit; font-size:14px; min-width:190px;
+}
+input:focus-visible, select:focus-visible, button:focus-visible, a:focus-visible {
+  outline:2px solid var(--s1); outline-offset:2px;
+}
+.kbd {
+  font:inherit; font-size:11px; border:1px solid var(--line-2); border-bottom-width:2px;
+  border-radius:5px; padding:1px 5px; color:var(--muted); background:var(--surface);
+}
+.legend { display:flex; gap:16px; color:var(--ink-2); font-size:12.5px; margin-bottom:6px; }
+.legend i { display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; }
+hr.sep { border:0; border-top:1px solid var(--line); margin:22px 0 18px; }
+.sectitle { font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:26px 0 10px; font-weight:650; }
+.sectitle:first-child { margin-top:0; }
+
+/* ---------------------------------------------------------------- tables */
+.scroll {
+  overflow-x:auto; border:1px solid var(--line); border-radius:var(--r2);
+  background:var(--surface); box-shadow:var(--shadow-1);
+}
+table { border-collapse:separate; border-spacing:0; width:100%; font-size:13.5px; }
+th, td { padding:9px 12px; text-align:left; white-space:nowrap; border-bottom:1px solid var(--grid); }
+tbody tr:last-child td { border-bottom:0; }
 th {
-  position:sticky; top:0; background:var(--surface); cursor:pointer;
-  color:var(--ink-2); font-weight:600; font-size:12px; user-select:none;
+  position:sticky; top:0; z-index:1; background:var(--surface); cursor:pointer;
+  color:var(--muted); font-weight:600; font-size:11.5px; text-transform:uppercase;
+  letter-spacing:.04em; user-select:none; border-bottom:1px solid var(--line-2);
 }
 th:hover { color:var(--ink); }
-th.sorted::after { content:" ↓"; color:var(--s1); }
+th.sorted { color:var(--s1); }
+th.sorted::after { content:" ↓"; }
 th.sorted.asc::after { content:" ↑"; }
 td.num, th.num { text-align:right; font-variant-numeric:tabular-nums; }
-tbody tr:hover { background:var(--plane); }
 tbody tr.click { cursor:pointer; }
-.yes { color:var(--good); font-weight:600; }
-.no  { color:var(--muted); }
-.empty { color:var(--muted); padding:28px; text-align:center; }
-.pill { display:inline-block; padding:1px 7px; border-radius:99px; background:var(--plane); border:1px solid var(--border); font-size:12px; margin:0 4px 4px 0; }
+tbody tr.click:hover td { background:var(--s1-soft); }
+td.who { font-weight:550; }
+td.empty, .empty { color:var(--muted); text-align:center; padding:26px 12px; font-size:13.5px; }
+/* magnitude behind a number, so a column can be scanned instead of read */
+.mag { position:relative; display:inline-block; min-width:86px; text-align:right; }
+.mag i {
+  position:absolute; right:0; top:50%; transform:translateY(-50%); height:16px;
+  background:var(--s1-soft); border-radius:3px; z-index:0;
+}
+.mag span { position:relative; z-index:1; padding:0 3px; }
+
+/* ---------------------------------------------------------------- empty states */
+.blank { text-align:center; padding:38px 22px; }
+.blank h3 { font-size:16px; margin-bottom:6px; }
+.blank p { color:var(--muted); font-size:13.5px; max-width:52ch; margin:0 auto 14px; }
+
+/* ---------------------------------------------------------------- pull */
+.pull-jobs { display:grid; gap:10px; margin:4px 0 16px; }
+.job {
+  display:flex; gap:12px; align-items:flex-start; border:1px solid var(--line);
+  border-radius:var(--r2); padding:13px 15px; cursor:pointer; background:var(--surface);
+}
+.job:hover { border-color:var(--line-2); background:var(--sunk); }
+.job:has(input:checked) { border-color:var(--s1); background:var(--s1-soft); }
+.job input { margin:3px 0 0; width:16px; height:16px; accent-color:var(--s1); flex:0 0 auto; }
+.job .t { font-weight:600; font-size:14px; }
+.job .d { color:var(--muted); font-size:12.5px; margin-top:2px; }
+.job .c { color:var(--ink-2); font-size:12px; margin-top:5px; font-variant-numeric:tabular-nums; }
+.field { display:block; margin-bottom:6px; }
+.field .lab { font-weight:600; font-size:13.5px; display:block; margin-bottom:5px; }
+.field input { width:100%; min-width:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; }
+.field .help { color:var(--muted); font-size:12.5px; margin-top:6px; }
+.bars { display:grid; gap:9px; margin:2px 0 14px; }
+.bar-row { font-size:13px; }
+.bar-row .top { display:flex; justify-content:space-between; gap:10px; margin-bottom:4px; }
+.bar-row .track { height:7px; background:var(--sunk); border-radius:999px; overflow:hidden; }
+.bar-row .fill { height:100%; background:var(--s1); border-radius:999px; transition:width .3s ease; }
+.bar-row.done .fill { background:var(--ok); }
+.log {
+  background:var(--sunk); border:1px solid var(--line); border-radius:var(--r2);
+  padding:11px 13px; max-height:260px; overflow-y:auto;
+  font:12.5px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace; color:var(--ink-2);
+}
+.log div { white-space:pre-wrap; word-break:break-word; }
+.log .e-error { color:var(--bad); }
+.log .e-warn { color:var(--warn); }
+.log .e-import { color:var(--ok); }
+.log .e-status, .log .e-job, .log .e-login { color:var(--ink); }
+.log .e-log { color:var(--muted); }
+.banner { border-radius:var(--r2); padding:12px 15px; font-size:13.5px; border:1px solid var(--line); background:var(--surface); margin-bottom:16px; }
+.banner.ok  { border-color:var(--ok);  background:var(--ok-soft); }
+.banner.bad { border-color:var(--bad); background:var(--bad-soft); color:var(--bad); }
+.banner b { color:var(--ink); }
+.banner .dim { color:var(--muted); }
+.checks { list-style:none; padding:0; margin:0; font-size:13.5px; }
+.checks li { display:flex; gap:10px; padding:9px 0; border-bottom:1px solid var(--grid); align-items:baseline; }
+.checks li:last-child { border-bottom:0; }
+.checks .m { flex:1 1 auto; }
+.checks .m .d { color:var(--muted); font-size:12.5px; }
+
+/* ---------------------------------------------------------------- charts */
+svg text.tick { fill:var(--muted); font-size:10.5px; }
+svg line.gridline { stroke:var(--grid); stroke-width:1; }
+svg line.axis { stroke:var(--axis); stroke-width:1; }
 #tip {
-  position:fixed; pointer-events:none; opacity:0; transition:opacity .08s;
-  background:var(--ink); color:var(--surface); padding:6px 9px; border-radius:6px;
-  font-size:12px; z-index:9; max-width:260px;
+  position:fixed; z-index:60; pointer-events:none; opacity:0; transition:opacity .1s;
+  background:var(--ink); color:var(--plane); border-radius:var(--r1);
+  padding:7px 10px; font-size:12.5px; line-height:1.45; box-shadow:var(--shadow-2); max-width:280px;
 }
+
+/* ---------------------------------------------------------------- drawer */
+#scrim { position:fixed; inset:0; background:rgba(0,0,0,.28); z-index:40; }
 #drawer {
-  position:fixed; inset:0 0 0 auto; width:min(460px,100%); background:var(--surface);
-  border-left:1px solid var(--border); padding:20px; overflow:auto; z-index:10;
-  box-shadow:-8px 0 32px rgba(0,0,0,.14);
+  position:fixed; top:0; right:0; bottom:0; width:min(460px,100vw); z-index:50;
+  background:var(--surface); border-left:1px solid var(--line); box-shadow:var(--shadow-2);
+  display:flex; flex-direction:column;
 }
-#drawer[hidden] { display:none; }
-#drawer h3 { margin:0 0 12px; font-size:16px; }
-#drawer button.x { position:absolute; top:14px; right:16px; background:none; border:0; color:var(--muted); font-size:20px; cursor:pointer; }
-.ev { border-bottom:1px solid var(--grid); padding:7px 0; font-size:13px; }
-.ev .m { color:var(--muted); font-size:12px; }
-.legend { display:flex; gap:14px; font-size:12px; color:var(--ink-2); margin-bottom:6px; }
-.legend i { display:inline-block; width:10px; height:2px; vertical-align:middle; margin-right:5px; }
-svg { display:block; max-width:100%; }
-.gridline { stroke:var(--grid); stroke-width:1; }
-.axis { stroke:var(--axis); stroke-width:1; }
-.tick { fill:var(--muted); font-size:10px; }
+#drawer header { padding:18px 20px 14px; border-bottom:1px solid var(--line); }
+#drawer .body { padding:16px 20px 40px; overflow-y:auto; flex:1 1 auto; }
+#drawer h3 { font-size:19px; }
+#drawer .x {
+  position:absolute; top:14px; right:14px; background:none; border:0; color:var(--muted);
+  font-size:22px; line-height:1; cursor:pointer; padding:4px 8px; border-radius:var(--r1);
+}
+#drawer .x:hover { background:var(--sunk); color:var(--ink); }
+.statgrid { display:grid; grid-template-columns:repeat(3,1fr); gap:9px; margin-bottom:6px; }
+.statgrid div { background:var(--sunk); border-radius:var(--r1); padding:9px 11px; }
+.statgrid .v { font-size:17px; font-weight:620; font-variant-numeric:tabular-nums; }
+.statgrid .k { color:var(--muted); font-size:11.5px; }
+.ev { display:flex; justify-content:space-between; gap:14px; padding:8px 0; border-bottom:1px solid var(--grid); font-size:13px; }
+.ev:last-child { border-bottom:0; }
+.ev .m { color:var(--muted); white-space:nowrap; font-variant-numeric:tabular-nums; }
+.ev .dir { color:var(--muted); }
+
+@media (max-width:640px) {
+  main { padding:20px 14px 80px; }
+  /* The snapshot/export detail wraps to a second line and shoves the action
+     button down. It is repeated on the Data tab, so drop it here. */
+  .brand span { display:none; }
+  .topbar-in { padding-top:12px; }
+  .topbar-in, nav { padding-left:14px; padding-right:14px; }
+  .hero { padding:20px; }
+  .hero .lede { font-size:19px; }
+}
 </style>
 </head>
 <body>
-<header>
-  <div class="hrow">
-    <div>
-      <h1>Instagram Tracker</h1>
-      <p class="sub" id="sub">loading…</p>
-    </div>
-    <button class="primary" id="refresh">Pull new data</button>
-  </div>
-  <div id="banner" hidden></div>
-</header>
 
-<nav id="tabs"></nav>
+<div class="topbar">
+  <div class="topbar-in">
+    <div class="brand">Instagram Tracker <span id="whoami"></span></div>
+    <div class="spacer"></div>
+    <button class="btn sm" id="refresh">Check folders for new data</button>
+  </div>
+  <nav id="tabs" role="tablist"></nav>
+</div>
 
 <main>
-  <section id="tab-overview">
+  <!-- ============================================================ TODAY -->
+  <section id="tab-today" role="tabpanel">
+    <div class="hero">
+      <div class="lede" id="lede">Loading…</div>
+      <div class="since" id="since"></div>
+    </div>
     <div class="tiles" id="tiles"></div>
     <div class="card">
-      <h2>Follower count over time</h2>
-      <p class="note">One point per export. Two exports are needed before a trend exists.</p>
+      <header>
+        <h2>Followers over time</h2>
+        <p class="note">One point per export. A trend needs at least two.</p>
+      </header>
       <div class="legend">
         <span><i style="background:var(--s1)"></i>Followers</span>
         <span><i style="background:var(--s2)"></i>Following</span>
       </div>
       <div id="trend"></div>
     </div>
-  </section>
-
-  <section id="tab-people" hidden>
-    <div class="toolbar">
-      <input type="search" id="q" placeholder="filter by username…">
-      <select id="pfilter">
-        <option value="all">everyone</option>
-        <option value="mutual">mutuals</option>
-        <option value="notback">they don't follow me back</option>
-        <option value="idontback">I don't follow them back</option>
-        <option value="ghost">no interaction either way</option>
-      </select>
-      <span class="sub" id="pcount"></span>
-    </div>
-    <div class="scroll"><table id="people"></table></div>
-  </section>
-
-  <section id="tab-unfollowers" hidden>
-    <div class="card"><h2>Unfollowers</h2>
-      <p class="note">Detected by diffing consecutive exports. Resolution is however often you export.</p></div>
-    <div class="scroll"><table id="unf"></table></div>
-  </section>
-
-  <section id="tab-inbound" hidden>
-    <div class="card">
-      <h2>Who engages with you</h2>
-      <p class="note">Not in the export — Instagram scopes exports to your own actions, so
-      this comes from lists you capture yourself.
-      <a href="/bookmarklet" style="color:var(--s1)">Get the bookmarklet →</a></p>
-      <div id="captures"></div>
-    </div>
-    <div id="inbound-body"></div>
-  </section>
-
-  <section id="tab-lurk" hidden>
-    <div class="card"><h2>Lurk gap</h2>
-      <p class="note">Accounts whose posts you see constantly and never engage with.</p></div>
-    <div class="scroll"><table id="lurk"></table></div>
-  </section>
-
-  <section id="tab-decay" hidden>
-    <div class="card"><h2>Going quiet</h2>
-      <p class="note">Mutual follows with no interaction in the selected window.</p>
-      <div class="toolbar">
-        <select id="decaydays">
-          <option value="30">30 days</option>
-          <option value="90" selected>90 days</option>
-          <option value="180">180 days</option>
-          <option value="365">a year</option>
-        </select>
+    <div class="grid2">
+      <div class="card flush">
+        <header><h2>Left recently</h2><p class="note">Found by comparing consecutive exports.</p></header>
+        <div class="scroll"><table id="unf-mini"></table></div>
+      </div>
+      <div class="card flush">
+        <header><h2>Closest right now</h2><p class="note">Recency-weighted, from your own actions.</p></header>
+        <div class="scroll"><table id="close-mini"></table></div>
       </div>
     </div>
-    <div class="scroll"><table id="decay"></table></div>
   </section>
 
-  <section id="tab-habits" hidden>
+  <!-- =========================================================== PEOPLE -->
+  <section id="tab-people" role="tabpanel" hidden>
+    <div class="toolbar">
+      <input type="search" id="q" placeholder="Search a username…">
+      <select id="pfilter">
+        <option value="all">Everyone</option>
+        <option value="mutual">Mutuals</option>
+        <option value="notback">You follow, they don't</option>
+        <option value="idontback">They follow, you don't</option>
+        <option value="ghost">Never interacted, either way</option>
+      </select>
+      <span class="spacer"></span>
+      <span class="count" id="pcount"></span>
+    </div>
+    <div class="scroll"><table id="people"></table></div>
+    <p class="note" style="margin-top:10px" id="pnote">Click anyone for their full history. Closeness is relative to
+      your strongest tie (100) and decays with time — a DM counts 5, a comment 4, a save 3, a story like 2.5, a like 2.</p>
+  </section>
+
+  <!-- ====================================================== CONNECTIONS -->
+  <section id="tab-connections" role="tabpanel" hidden>
+    <div id="conn-body"></div>
+  </section>
+
+  <!-- ============================================================== YOU -->
+  <section id="tab-you" role="tabpanel" hidden>
     <div class="card">
-      <h2>When you're active</h2>
-      <p class="note">Every recorded interaction, by local weekday and hour. Darker means more.</p>
+      <header><h2>When you're active</h2>
+        <p class="note">Every timestamped action, by weekday and hour, in your local time.</p></header>
       <div id="heat"></div>
     </div>
     <div class="card">
-      <h2>Interaction volume by month</h2>
-      <p class="note">Are you using Instagram more or less over time?</p>
+      <header><h2>How much you use Instagram</h2>
+        <p class="note">Recorded actions per month. A tall recent bar means a busy month, not a bigger export.</p></header>
       <div id="months"></div>
+    </div>
+    <div class="card" id="taste-card">
+      <header><h2>What Instagram thinks you like</h2>
+        <p class="note">Instagram's own inferred model of you, lifted straight from your export.</p></header>
+      <div id="taste-body"></div>
+    </div>
+    <div class="card flush">
+      <header><h2>Whose posts you save</h2>
+        <p class="note">Saving is the strongest signal you leave without them being told.</p></header>
+      <div class="scroll"><table id="saved"></table></div>
     </div>
   </section>
 
-  <section id="tab-taste" hidden>
-    <div class="card"><h2>What Instagram thinks you're into</h2>
-      <p class="note">Instagram's own inferred model of you, taken from your export.</p>
-      <div id="topics"></div></div>
-    <div class="card"><h2>Hashtags you follow</h2><div id="hashtags"></div></div>
-    <div class="card"><h2>Recent searches</h2><div id="searches"></div></div>
-    <div class="card"><h2>Whose posts you save</h2><div class="scroll"><table id="saved"></table></div></div>
+  <!-- ============================================================= DATA -->
+  <section id="tab-data" role="tabpanel" hidden>
+    <div id="pull-banner"></div>
+
+    <div class="card">
+      <header>
+        <h2>Pull from Instagram now</h2>
+        <p class="note">Fetches what the export leaves out. Runs on this machine, paced 3–6 seconds
+          between requests, and imports itself when it finishes.</p>
+      </header>
+      <div id="pull-form"></div>
+    </div>
+
+    <div class="card" id="pull-progress-card" hidden>
+      <header><h2>Pull in progress</h2><p class="note" id="pull-sub"></p></header>
+      <div class="bars" id="pull-bars"></div>
+      <div class="log" id="pull-log"></div>
+      <div style="margin-top:14px"><button class="btn danger sm" id="pull-cancel">Stop</button></div>
+    </div>
+
+    <div class="grid2">
+      <div class="card">
+        <header><h2>What's in the database</h2><p class="note">Everything the dashboard is built from.</p></header>
+        <ul class="checks" id="status-list"></ul>
+      </div>
+      <div class="card">
+        <header><h2>What's still missing, and why</h2>
+          <p class="note">Some of this Instagram simply does not give out. Better to say so than to show a zero.</p></header>
+        <ul class="checks" id="gaps-list"></ul>
+      </div>
+    </div>
+
+    <div class="card">
+      <header><h2>Automatic exports</h2></header>
+      <p class="note" id="watching"></p>
+      <p class="note" style="margin-top:10px">Instagram → Settings → Accounts Centre → Your information and
+        permissions → Download your information → <b>All available information</b>, JSON, All time. Send it to
+        Google Drive or Dropbox on a monthly schedule and it will be picked up on its own.
+        For lists Instagram won't export at all, <a href="/bookmarklet">use the capture bookmarklet →</a></p>
+    </div>
   </section>
 </main>
 
 <div id="tip"></div>
-<div id="drawer" hidden><button class="x" id="closed">&times;</button><div id="drawerbody"></div></div>
 
 <script>
-const TABS = [
-  ['overview','Overview'], ['people','People'], ['unfollowers','Unfollowers'],
-  ['inbound','Inbound'], ['lurk','Lurk gap'], ['decay','Going quiet'],
-  ['habits','Habits'], ['taste','Taste'],
-];
+/* =============================================================== helpers */
 const $ = (s) => document.querySelector(s);
 const el = (t, a = {}, kids = []) => {
   const n = document.createElement(t);
   for (const [k, v] of Object.entries(a)) {
-    if (k === 'class') n.className = v; else if (k === 'text') n.textContent = v;
-    else n.setAttribute(k, v);
+    if (v == null || v === false) continue;
+    if (k === 'class') n.className = v;
+    else if (k === 'text') n.textContent = v;
+    else if (k === 'html') n.innerHTML = v;
+    else n.setAttribute(k, v === true ? '' : v);
   }
-  for (const c of [].concat(kids)) n.append(c);
+  for (const c of [].concat(kids)) if (c != null) n.append(c);
   return n;
 };
 const svg = (t, a = {}) => {
@@ -241,16 +446,33 @@ const svg = (t, a = {}) => {
   return n;
 };
 const get = (u) => fetch(u).then((r) => r.json());
-const fmtDate = (t) => t == null ? '—' : new Date(t * 1000).toISOString().slice(0, 10);
+const post = async (u, body) => {
+  const r = await fetch(u, {
+    method: 'POST',
+    headers: body ? { 'content-type': 'application/json' } : {},
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || ('HTTP ' + r.status));
+  return j;
+};
+const n0 = (v) => (v == null ? '—' : Number(v).toLocaleString());
+const plural = (n, w, p) => n + ' ' + (n === 1 ? w : (p || w + 's'));
+const fmtDate = (t) => (t == null ? '—' : new Date(t * 1000).toLocaleDateString(undefined,
+  { year: 'numeric', month: 'short', day: 'numeric' }));
 const ago = (t) => {
   if (t == null) return 'never';
   const d = Math.round((Date.now() / 1000 - t) / 86400);
-  return d <= 0 ? 'today' : d === 1 ? 'yesterday' : d < 365 ? d + 'd ago' : (d / 365).toFixed(1) + 'y ago';
+  if (d <= 0) return 'today';
+  if (d === 1) return 'yesterday';
+  if (d < 31) return d + 'd ago';
+  if (d < 365) return Math.round(d / 30) + 'mo ago';
+  return (d / 365).toFixed(1) + 'y ago';
 };
 const isDark = () => matchMedia('(prefers-color-scheme: dark)').matches;
 
-// Sequential blue ramp. On a dark surface the order flips so that near-zero
-// recedes toward the surface instead of glowing.
+// Sequential blue ramp, validated for ordered data. On a dark surface the order
+// flips so near-zero recedes into the background instead of glowing.
 const RAMP = ['#cde2fb','#b7d3f6','#9ec5f4','#86b6ef','#6da7ec','#5598e7','#3987e5',
               '#2a78d6','#256abf','#1c5cab','#184f95','#104281','#0d366b'];
 const ramp = (f) => {
@@ -258,12 +480,12 @@ const ramp = (f) => {
   return arr[Math.min(arr.length - 1, Math.max(0, Math.round(f * (arr.length - 1))))];
 };
 
-// ---------- tooltip ----------
+/* =============================================================== tooltip */
 const tip = $('#tip');
 function showTip(e, html) {
   tip.innerHTML = html; tip.style.opacity = 1;
   const r = tip.getBoundingClientRect();
-  tip.style.left = Math.min(innerWidth - r.width - 8, e.clientX + 12) + 'px';
+  tip.style.left = Math.min(innerWidth - r.width - 8, Math.max(8, e.clientX + 12)) + 'px';
   tip.style.top = Math.max(8, e.clientY - r.height - 10) + 'px';
 }
 const hideTip = () => { tip.style.opacity = 0; };
@@ -272,20 +494,25 @@ function hoverable(node, html) {
   node.addEventListener('mouseleave', hideTip);
 }
 
-// ---------- generic sortable table ----------
+/* ================================================================= table */
 function table(mount, cols, rows, opts = {}) {
   const t = typeof mount === 'string' ? $(mount) : mount;
+  if (!t) return;
   t.innerHTML = '';
   if (!rows.length) {
-    t.append(el('tbody', {}, el('tr', {}, el('td', { class: 'empty', colspan: cols.length,
-      text: opts.empty || 'Nothing here yet.' }))));
+    t.append(el('tbody', {}, el('tr', {}, el('td',
+      { class: 'empty', colspan: cols.length, text: opts.empty || 'Nothing here yet.' }))));
     return;
   }
+  // Magnitude bars are scaled per column so the widest bar is the biggest value
+  // in what is actually on screen, not an absolute the reader cannot see.
+  const maxOf = {};
+  for (const c of cols) if (c.mag) maxOf[c.k] = Math.max(...rows.map((r) => Number(r[c.k]) || 0), 0);
+
   let sortKey = opts.sort || cols[0].k, asc = !!opts.asc;
   const thead = el('thead'), tr = el('tr');
   cols.forEach((c) => {
-    const th = el('th', { class: c.num ? 'num' : '', text: c.t });
-    if (c.title) th.title = c.title;
+    const th = el('th', { class: c.num ? 'num' : '', text: c.t, title: c.title });
     th.onclick = () => { if (sortKey === c.k) asc = !asc; else { sortKey = c.k; asc = !!c.asc; } draw(); };
     tr.append(th);
   });
@@ -294,7 +521,8 @@ function table(mount, cols, rows, opts = {}) {
 
   function draw() {
     [...thead.querySelectorAll('th')].forEach((th, i) => {
-      th.className = (cols[i].num ? 'num ' : '') + (cols[i].k === sortKey ? 'sorted' + (asc ? ' asc' : '') : '');
+      th.className = (cols[i].num ? 'num ' : '') +
+        (cols[i].k === sortKey ? 'sorted' + (asc ? ' asc' : '') : '');
     });
     const sorted = [...rows].sort((a, b) => {
       const x = a[sortKey], y = b[sortKey];
@@ -308,9 +536,19 @@ function table(mount, cols, rows, opts = {}) {
     for (const r of sorted) {
       const row = el('tr', opts.onRow ? { class: 'click' } : {});
       for (const c of cols) {
-        const td = el('td', { class: c.num ? 'num' : '' });
-        const v = c.render ? c.render(r) : r[c.k];
-        if (v instanceof Node) td.append(v); else td.textContent = v ?? '—';
+        const td = el('td', { class: [c.num ? 'num' : '', c.who ? 'who' : ''].filter(Boolean).join(' ') });
+        if (c.mag) {
+          const v = Number(r[c.k]) || 0, m = maxOf[c.k] || 1;
+          const wrap = el('span', { class: 'mag' }, [
+            el('i', { style: `width:${Math.max(v > 0 ? 6 : 0, (v / m) * 100)}%` }),
+            el('span', { text: c.render ? c.render(r) : n0(r[c.k]) }),
+          ]);
+          td.append(wrap);
+        } else {
+          const v = c.render ? c.render(r) : r[c.k];
+          if (v instanceof Node) td.append(v);
+          else td.textContent = v == null || v === '' ? '—' : v;
+        }
         row.append(td);
       }
       if (opts.onRow) row.onclick = () => opts.onRow(r);
@@ -319,86 +557,100 @@ function table(mount, cols, rows, opts = {}) {
   }
   draw();
 }
-const bool = (b) => el('span', { class: b ? 'yes' : 'no', text: b ? 'yes' : '–' });
+const tag = (cls, text) => el('span', { class: 'tag ' + cls, text });
+function blank(title, body, action) {
+  return el('div', { class: 'blank' }, [
+    el('h3', { text: title }), el('p', { text: body }), action || null,
+  ]);
+}
 
-// ---------- charts ----------
+/* ================================================================ charts */
 function lineChart(mount, snaps) {
-  const box = $(mount); box.innerHTML = '';
-  if (!snaps.length) { box.append(el('p', { class: 'empty', text: 'No snapshots yet.' })); return; }
-  if (snaps.length === 1) {
-    const s = snaps[0];
-    box.append(el('p', { class: 'empty',
-      text: `One snapshot so far: ${s.followers} followers, ${s.following} following. Ingest a second export to see a trend.` }));
+  const box = $(mount); if (!box) return;
+  box.innerHTML = '';
+  if (!snaps.length) {
+    box.append(blank('No exports yet', 'Once one export is in, this shows your follower count. Two shows the trend.',
+      el('button', { class: 'btn primary', text: 'Go to Data' , onclick: '' })));
+    box.querySelector('button').onclick = () => go('data');
     return;
   }
-  const W = Math.min(880, box.clientWidth || 880), H = 240, P = { t: 12, r: 16, b: 26, l: 44 };
+  if (snaps.length === 1) {
+    const s = snaps[0];
+    box.append(blank('One snapshot so far',
+      `${n0(s.followers)} followers and ${n0(s.following)} following on ${fmtDate(s.takenAt)}. ` +
+      'A second export turns this into a trend — and is what makes unfollower detection possible at all.',
+      (() => { const b = el('button', { class: 'btn primary', text: 'Set up automatic exports' });
+               b.onclick = () => go('data'); return b; })()));
+    return;
+  }
+  const W = Math.min(1060, box.clientWidth || 900), H = 250, P = { t: 14, r: 54, b: 28, l: 48 };
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
-  const max = Math.max(...snaps.flatMap((s) => [s.followers, s.following])) * 1.1 || 1;
-  const x = (i) => P.l + (snaps.length === 1 ? iw / 2 : (i / (snaps.length - 1)) * iw);
+  const max = Math.max(...snaps.flatMap((s) => [s.followers, s.following])) * 1.12 || 1;
+  const x = (i) => P.l + (i / (snaps.length - 1)) * iw;
   const y = (v) => P.t + ih - (v / max) * ih;
-
   const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
+
   for (let g = 0; g <= 4; g++) {
     const yy = P.t + (g / 4) * ih;
     s.append(svg('line', { x1: P.l, x2: W - P.r, y1: yy, y2: yy, class: 'gridline' }));
-    const lab = svg('text', { x: P.l - 8, y: yy + 3, class: 'tick', 'text-anchor': 'end' });
-    lab.textContent = Math.round(max * (1 - g / 4));
+    const lab = svg('text', { x: P.l - 9, y: yy + 3.5, class: 'tick', 'text-anchor': 'end' });
+    lab.textContent = n0(Math.round(max * (1 - g / 4)));
     s.append(lab);
   }
   s.append(svg('line', { x1: P.l, x2: W - P.r, y1: P.t + ih, y2: P.t + ih, class: 'axis' }));
 
   for (const [key, color] of [['followers', 'var(--s1)'], ['following', 'var(--s2)']]) {
     const d = snaps.map((sn, i) => `${i ? 'L' : 'M'}${x(i)},${y(sn[key])}`).join(' ');
-    s.append(svg('path', { d, fill: 'none', stroke: color, 'stroke-width': 2,
+    s.append(svg('path', { d, fill: 'none', stroke: color, 'stroke-width': 2.25,
       'stroke-linejoin': 'round', 'stroke-linecap': 'round' }));
     snaps.forEach((sn, i) => {
-      // 2px surface ring keeps overlapping markers separable
+      // A 2px surface ring keeps overlapping markers separable.
       const c = svg('circle', { cx: x(i), cy: y(sn[key]), r: 4.5, fill: color,
         stroke: 'var(--surface)', 'stroke-width': 2 });
-      hoverable(c, `<b>${sn[key]}</b> ${key}<br>${fmtDate(sn.takenAt)}`);
+      hoverable(c, `<b>${n0(sn[key])}</b> ${key}<br>${fmtDate(sn.takenAt)}`);
       s.append(c);
     });
-    // direct label on the last point
+    // Direct label at the line's end beats a legend lookup.
     const last = snaps[snaps.length - 1];
-    const lab = svg('text', { x: x(snaps.length - 1) - 6, y: y(last[key]) - 10,
-      class: 'tick', 'text-anchor': 'end', fill: 'var(--ink-2)' });
+    const lab = svg('text', { x: x(snaps.length - 1) + 8, y: y(last[key]) + 4,
+      class: 'tick', 'text-anchor': 'start', fill: color });
     lab.textContent = key;
     s.append(lab);
   }
   snaps.forEach((sn, i) => {
     if (snaps.length > 8 && i % Math.ceil(snaps.length / 8)) return;
-    const t = svg('text', { x: x(i), y: H - 8, class: 'tick', 'text-anchor': 'middle' });
-    t.textContent = fmtDate(sn.takenAt).slice(5);
+    const t = svg('text', { x: x(i), y: H - 9, class: 'tick', 'text-anchor': 'middle' });
+    t.textContent = fmtDate(sn.takenAt).replace(/,.*/, '');
     s.append(t);
   });
   box.append(s);
 }
 
 function heatmap(mount, grid) {
-  const box = $(mount); box.innerHTML = '';
+  const box = $(mount); if (!box) return;
+  box.innerHTML = '';
   const max = Math.max(...grid.flat());
-  if (!max) { box.append(el('p', { class: 'empty', text: 'No timestamped interactions yet.' })); return; }
+  if (!max) {
+    box.append(blank('Nothing timestamped yet', 'Ingest an export and this fills in.'));
+    return;
+  }
   const DAYS = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-  const cell = 24, gap = 2, L = 34, T = 16;
-  const W = L + 24 * (cell + gap), H = T + 7 * (cell + gap) + 6;
-  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
-
+  const cell = 24, gap = 3, L = 38, T = 18;
+  const W = L + 24 * (cell + gap), H = T + 7 * (cell + gap) + 8;
+  const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H, style: 'max-width:100%' });
   for (let h = 0; h < 24; h += 3) {
-    const t = svg('text', { x: L + h * (cell + gap) + cell / 2, y: 10, class: 'tick', 'text-anchor': 'middle' });
-    t.textContent = h;
+    const t = svg('text', { x: L + h * (cell + gap) + cell / 2, y: 11, class: 'tick', 'text-anchor': 'middle' });
+    t.textContent = h === 0 ? '12a' : h === 12 ? '12p' : h < 12 ? h + 'a' : (h - 12) + 'p';
     s.append(t);
   }
   grid.forEach((row, d) => {
-    const t = svg('text', { x: L - 7, y: T + d * (cell + gap) + cell / 2 + 4, class: 'tick', 'text-anchor': 'end' });
+    const t = svg('text', { x: L - 8, y: T + d * (cell + gap) + cell / 2 + 4, class: 'tick', 'text-anchor': 'end' });
     t.textContent = DAYS[d];
     s.append(t);
     row.forEach((n, h) => {
-      const r = svg('rect', {
-        x: L + h * (cell + gap), y: T + d * (cell + gap),
-        width: cell, height: cell, rx: 3,
-        fill: n === 0 ? 'var(--cell0)' : ramp(n / max),
-      });
-      hoverable(r, `<b>${n}</b> interaction${n === 1 ? '' : 's'}<br>${DAYS[d]} ${h}:00–${h + 1}:00`);
+      const r = svg('rect', { x: L + h * (cell + gap), y: T + d * (cell + gap),
+        width: cell, height: cell, rx: 4, fill: n === 0 ? 'var(--cell0)' : ramp(n / max) });
+      hoverable(r, `<b>${n0(n)}</b> ${n === 1 ? 'action' : 'actions'}<br>${DAYS[d]} ${h}:00–${h + 1}:00`);
       s.append(r);
     });
   });
@@ -406,32 +658,30 @@ function heatmap(mount, grid) {
 }
 
 function barChart(mount, data) {
-  const box = $(mount); box.innerHTML = '';
-  if (!data.length) { box.append(el('p', { class: 'empty', text: 'No data yet.' })); return; }
-  const W = Math.min(880, box.clientWidth || 880), H = 200, P = { t: 10, r: 12, b: 28, l: 44 };
+  const box = $(mount); if (!box) return;
+  box.innerHTML = '';
+  if (!data.length) { box.append(blank('Nothing yet', 'Ingest an export and this fills in.')); return; }
+  const W = Math.min(1060, box.clientWidth || 900), H = 210, P = { t: 12, r: 14, b: 30, l: 48 };
   const iw = W - P.l - P.r, ih = H - P.t - P.b;
-  const max = Math.max(...data.map((d) => d.n)) * 1.1 || 1;
-  const bw = Math.max(3, Math.min(56, iw / data.length - 2));
+  const max = Math.max(...data.map((d) => d.n)) * 1.12 || 1;
+  const step = iw / data.length;
+  const bw = Math.max(3, Math.min(46, step - 3));
   const s = svg('svg', { viewBox: `0 0 ${W} ${H}`, width: '100%', height: H });
-
   for (let g = 0; g <= 3; g++) {
     const yy = P.t + (g / 3) * ih;
     s.append(svg('line', { x1: P.l, x2: W - P.r, y1: yy, y2: yy, class: 'gridline' }));
-    const lab = svg('text', { x: P.l - 8, y: yy + 3, class: 'tick', 'text-anchor': 'end' });
-    lab.textContent = Math.round(max * (1 - g / 3));
+    const lab = svg('text', { x: P.l - 9, y: yy + 3.5, class: 'tick', 'text-anchor': 'end' });
+    lab.textContent = n0(Math.round(max * (1 - g / 3)));
     s.append(lab);
   }
   data.forEach((d, i) => {
     const h = (d.n / max) * ih;
-    const r = svg('rect', {
-      x: P.l + i * (iw / data.length), y: P.t + ih - h,
-      width: bw, height: Math.max(1, h), rx: 4, fill: 'var(--s1)',
-    });
-    hoverable(r, `<b>${d.n}</b> interactions<br>${d.month}`);
+    const r = svg('rect', { x: P.l + i * step + (step - bw) / 2, y: P.t + ih - h,
+      width: bw, height: Math.max(1, h), rx: 3, fill: 'var(--s1)' });
+    hoverable(r, `<b>${n0(d.n)}</b> actions<br>${d.month}`);
     s.append(r);
     if (data.length <= 14 || i % Math.ceil(data.length / 12) === 0) {
-      const t = svg('text', { x: P.l + i * (iw / data.length) + bw / 2, y: H - 10,
-        class: 'tick', 'text-anchor': 'middle' });
+      const t = svg('text', { x: P.l + i * step + step / 2, y: H - 10, class: 'tick', 'text-anchor': 'middle' });
       t.textContent = d.month.slice(2);
       s.append(t);
     }
@@ -440,279 +690,647 @@ function barChart(mount, data) {
   box.append(s);
 }
 
-// ---------- drawer ----------
+/* ================================================================ drawer */
+/**
+ * Say what happened in words. The raw kinds plus a direction arrow produced
+ * lines like "them like received", which is three words for one idea and reads
+ * like a database column, because it is one.
+ */
+const KIND_LABEL = {
+  like_received: 'liked your post',
+  comment_received: 'commented on your post',
+  story_view: 'viewed your story',
+  like: 'you liked their post',
+  comment: 'you commented',
+  save: 'you saved their post',
+  story_like: 'you liked their story',
+  mention: 'mentioned you',
+  dm: 'DM',
+};
+const kindLabel = (kind, direction) =>
+  KIND_LABEL[kind] || ((direction === 'out' ? 'you ' : 'they ') + kind.replace(/_/g, ' '));
+
+let drawerOpen = false;
 async function openPerson(username) {
   const d = await get('/api/person/' + encodeURIComponent(username));
-  const b = $('#drawerbody'); b.innerHTML = '';
-  b.append(el('h3', { text: '@' + username }));
-  if (d.row) {
-    const r = d.row;
-    b.append(el('p', { class: 'sub', text:
-      `${r.followsMe ? 'follows you' : 'does not follow you'} · ${r.iFollow ? 'you follow them' : 'you do not follow them'}` +
-      (r.followedSince ? ` · since ${fmtDate(r.followedSince)}` : '') }));
-    const stats = [['likes', r.likes], ['comments', r.comments], ['story likes', r.storyLikes],
-      ['saves', r.saves], ['DMs out', r.dmOut], ['DMs in', r.dmIn], ['posts seen', r.views],
-      ['closeness', relScore(r.score) + '/100']];
-    const wrap = el('div', {}, stats.map(([k, v]) => el('span', { class: 'pill', text: `${k}: ${v}` })));
-    b.append(wrap);
-  }
-  for (const e of d.events) {
-    b.append(el('div', { class: 'ev' }, [
-      el('div', { text: e.kind.replace(/_/g, ' ') }),
-      el('div', { class: 'm', text: fmtDate(e.occurredAt) }),
+  closeDrawer();
+  const scrim = el('div', { id: 'scrim' });
+  scrim.onclick = closeDrawer;
+  const body = el('div', { class: 'body' });
+  const head = el('header');
+  const xb = el('button', { class: 'x', text: '×', 'aria-label': 'Close' });
+  xb.onclick = closeDrawer;
+  head.append(xb, el('h3', { text: '@' + username }));
+
+  const r = d.row;
+  if (r) {
+    head.append(el('p', { class: 'rel', style: 'margin-top:4px' }, [
+      relTag(r), el('span', { text: r.followedSince ? '  ·  following you since ' + fmtDate(r.followedSince) : '' }),
     ]));
+    body.append(el('div', { class: 'statgrid' }, [
+      ['closeness', relScore(r.score)], ['likes', r.likes], ['comments', r.comments],
+      ['story ♥', r.storyLikes], ['saves', r.saves], ['DMs sent', r.dmOut],
+      ['DMs got', r.dmIn], ['mentions', r.mentions], ['posts seen', r.views],
+    ].map(([k, v]) => el('div', {}, [el('div', { class: 'v', text: n0(v) }), el('div', { class: 'k', text: k })]))));
   }
-  if (!d.timeline.length) b.append(el('p', { class: 'empty', text: 'No recorded interactions.' }));
+  if (d.events.length) {
+    body.append(el('div', { class: 'sectitle', text: 'Follow history' }));
+    for (const e of d.events) {
+      body.append(el('div', { class: 'ev' }, [
+        el('div', { text: e.kind.replace(/_/g, ' ') }),
+        el('div', { class: 'm', text: fmtDate(e.occurredAt) }),
+      ]));
+    }
+  }
+  body.append(el('div', { class: 'sectitle', text: `Interactions (${n0(d.timeline.length)})` }));
+  if (!d.timeline.length) {
+    body.append(el('p', { class: 'empty', text: 'Nothing recorded either way.' }));
+  }
   for (const t of d.timeline.slice(0, 200)) {
-    b.append(el('div', { class: 'ev' }, [
-      el('div', { text: (t.direction === 'out' ? '→ ' : '← ') + t.kind.replace(/_/g, ' ') + (t.text ? ': ' + t.text : '') }),
+    body.append(el('div', { class: 'ev' }, [
+      el('div', {}, [
+        el('span', { class: 'dir', text: t.direction === 'out' ? '→ ' : '← ' }),
+        el('span', { text: kindLabel(t.kind, t.direction) + (t.text ? ': ' + t.text : '') }),
+      ]),
       el('div', { class: 'm', text: fmtDate(t.occurredAt) }),
     ]));
   }
-  $('#drawer').hidden = false;
+  const dr = el('div', { id: 'drawer' }, [head, body]);
+  document.body.append(scrim, dr);
+  drawerOpen = true;
+  xb.focus();
 }
-$('#closed').onclick = () => { $('#drawer').hidden = true; };
-addEventListener('keydown', (e) => { if (e.key === 'Escape') $('#drawer').hidden = true; });
-
-// ---------- tabs ----------
-let current = 'overview';
-const nav = $('#tabs');
-TABS.forEach(([id, label]) => {
-  const b = el('button', { text: label, 'aria-selected': id === 'overview' });
-  b.onclick = () => {
-    current = id;
-    [...nav.children].forEach((c, i) => c.setAttribute('aria-selected', TABS[i][0] === id));
-    TABS.forEach(([t]) => { $('#tab-' + t).hidden = t !== id; });
-    if (id === 'overview') lineChart('#trend', STATE.overview.snapshots);
-    if (id === 'habits') { heatmap('#heat', STATE.habits.heatmap); barChart('#months', STATE.habits.byMonth); }
-    if (id === 'inbound') loadInbound();
-  };
-  nav.append(b);
+function closeDrawer() {
+  $('#scrim')?.remove();
+  $('#drawer')?.remove();
+  drawerOpen = false;
+}
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && drawerOpen) closeDrawer();
+  if (e.key === '/' && !/^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
+    e.preventDefault(); go('people'); $('#q').focus();
+  }
 });
 
-// ---------- load ----------
+/* ================================================================== tabs */
+const TABS = [
+  ['today', 'Today'], ['people', 'People'], ['connections', 'Connections'],
+  ['you', 'You'], ['data', 'Data'],
+];
+let current = 'today';
+function go(id) {
+  current = id;
+  const nav = $('#tabs');
+  [...nav.children].forEach((c, i) => c.setAttribute('aria-selected', TABS[i][0] === id));
+  TABS.forEach(([t]) => { $('#tab-' + t).hidden = t !== id; });
+  location.hash = id;
+  // Charts need a laid-out container to measure, so they are drawn on reveal.
+  if (id === 'today') lineChart('#trend', (STATE.overview || { snapshots: [] }).snapshots);
+  if (id === 'you' && STATE.habits) {
+    heatmap('#heat', STATE.habits.heatmap);
+    barChart('#months', STATE.habits.byMonth);
+  }
+  if (id === 'connections') renderConnections();
+  if (id === 'data') loadPull();
+  scrollTo({ top: 0 });
+}
+
+/* ================================================================= state */
 const STATE = {};
 let allPeople = [];
-
-// The raw decayed score falls below 0.05 for anything older than roughly a
-// year, so every row would print "0.0" and the column would look broken even
-// though the ordering is right. Show each tie relative to the strongest one.
+// The raw decayed score drops below 0.05 for anything a year old, so printing it
+// directly makes every row read "0.0". Show each tie relative to the strongest.
 let maxScore = 0;
-const relScore = (v) => (maxScore <= 0 ? '0' : String(Math.round((v / maxScore) * 100)));
+const relScore = (v) => (maxScore <= 0 ? 0 : Math.round((v / maxScore) * 100));
+const touched = (p) => p.likes + p.comments + p.storyLikes + p.saves + p.dmOut + p.dmIn + p.mentions;
+const relTag = (p) => p.followsMe && p.iFollow ? tag('ok', 'mutual')
+  : p.iFollow ? tag('warn', 'you follow')
+  : p.followsMe ? tag('mute', 'they follow')
+  : tag('mute', 'no follow');
+
+/* ================================================================= today */
+function renderToday() {
+  const ov = STATE.overview, st = STATE.status;
+  const latest = ov.snapshots[ov.snapshots.length - 1];
+  const mutuals = allPeople.filter((p) => p.followsMe && p.iFollow).length;
+  const ghosts = (STATE.inbound && STATE.inbound.ghosts.length) || 0;
+
+  $('#whoami').textContent = st.snapshots
+    ? `· ${plural(st.snapshots, 'snapshot')} · last export ${st.lastExport ? ago(st.lastExport) : 'unknown'}`
+    : '· nothing ingested yet';
+
+  if (!latest) {
+    $('#lede').textContent = 'Nothing ingested yet.';
+    $('#since').innerHTML = 'Head to <b>Data</b> to pull from Instagram directly, or request an export.';
+  } else {
+    const bits = [`<b>${n0(latest.followers)}</b> followers`, `<b>${n0(latest.following)}</b> following`,
+      `<b>${n0(mutuals)}</b> mutual`];
+    $('#lede').innerHTML = bits.join(' · ') + '.';
+    const tail = [];
+    if (ov.lost) tail.push(`<b>${plural(ov.lost, 'person', 'people')}</b> stopped following you`);
+    if (ov.gained) tail.push(`<b>${n0(ov.gained)}</b> new followers`);
+    if (ghosts) tail.push(`<b>${n0(ghosts)}</b> have never engaged with you`);
+    $('#since').innerHTML = tail.length
+      ? tail.join(' · ') + `. Last export ${ago(st.lastExport)}.`
+      : ov.snapshots.length < 2
+        ? 'One export so far, so nothing to compare against yet — a second one is what makes unfollowers detectable.'
+        : `No follower changes between your ${plural(ov.snapshots.length, 'export')}.`;
+  }
+
+  const tiles = [
+    ['followers', latest ? latest.followers : 0, 'people'],
+    ['following', latest ? latest.following : 0, 'people'],
+    ['mutuals', mutuals, 'people'],
+    ['unfollowers', ov.lost, 'connections', ov.lost > 0],
+    ['never engaged', ghosts, 'connections'],
+    ['recorded actions', ov.totalInteractions, 'you'],
+  ];
+  const box = $('#tiles'); box.innerHTML = '';
+  for (const [k, v, dest, isBad] of tiles) {
+    const b = el('button', { class: 'tile' + (isBad ? ' bad' : '') }, [
+      el('div', { class: 'v', text: n0(v) }),
+      el('div', { class: 'k', text: k }),
+      el('div', { class: 'go', text: 'View →' }),
+    ]);
+    b.onclick = () => go(dest);
+    box.append(b);
+  }
+
+  table('#unf-mini', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'detectedAt', t: 'noticed', render: (r) => ago(r.detectedAt) },
+    { k: 'daysLasted', t: 'days', num: true },
+  ], STATE.unfollowers.slice(0, 8), {
+    sort: 'detectedAt',
+    empty: ov.snapshots.length < 2 ? 'Needs a second export to compare against.' : 'Nobody has left.',
+    onRow: (r) => openPerson(r.username),
+  });
+
+  table('#close-mini', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'score', t: 'closeness', num: true, mag: true, render: (r) => relScore(r.score) },
+    { k: 'lastInteraction', t: 'last', render: (r) => ago(r.lastInteraction) },
+  ], [...allPeople].sort((a, b) => b.score - a.score).slice(0, 8), {
+    sort: 'score', empty: 'No interactions recorded yet.', onRow: (r) => openPerson(r.username),
+  });
+}
+
+/* ================================================================ people */
+/**
+ * A column of nothing but zeros reads as "this person never did that", when the
+ * truth is that the export stopped naming who was involved. Drop those columns
+ * and say so once, rather than repeating a wrong zero 7,000 times.
+ *
+ * Decided from the full list, not the filtered one, so columns do not appear and
+ * vanish as you type.
+ */
+const WHY_EMPTY = {
+  likes: 'Instagram stopped naming who you liked — the 33k likes it exported have no author',
+  comments: 'no attributed comments in this export',
+  dmOut: 'no sent DMs recorded',
+  dmIn: 'no received DMs recorded',
+  views: 'this export carries almost no feed history',
+};
+function liveColumns() {
+  return Object.keys(WHY_EMPTY).filter((k) => allPeople.some((p) => p[k] > 0));
+}
 
 function renderPeople() {
   maxScore = allPeople.reduce((m, p) => Math.max(m, p.score), 0);
-  const q = $('#q').value.trim().toLowerCase();
+  const q = $('#q').value.trim().toLowerCase().replace(/^@/, '');
   const f = $('#pfilter').value;
   const rows = allPeople.filter((p) => {
     if (q && !p.username.includes(q)) return false;
-    const touched = p.likes + p.comments + p.storyLikes + p.saves + p.dmOut + p.dmIn + p.mentions;
     if (f === 'mutual') return p.followsMe && p.iFollow;
     if (f === 'notback') return p.iFollow && !p.followsMe;
     if (f === 'idontback') return p.followsMe && !p.iFollow;
-    if (f === 'ghost') return touched === 0;
+    if (f === 'ghost') return touched(p) === 0;
     return true;
   });
-  $('#pcount').textContent = `${rows.length} of ${allPeople.length}`;
-  table('#people', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'followsMe', t: 'follows you', render: (r) => bool(r.followsMe) },
-    { k: 'iFollow', t: 'you follow', render: (r) => bool(r.iFollow) },
-    { k: 'followedSince', t: 'since', render: (r) => fmtDate(r.followedSince) },
+  $('#pcount').textContent = `${n0(rows.length)} of ${n0(allPeople.length)}`;
+
+  const live = liveColumns();
+  const optional = [
     { k: 'likes', t: 'likes', num: true },
     { k: 'comments', t: 'comments', num: true },
-    { k: 'storyLikes', t: 'story ♥', num: true },
-    { k: 'saves', t: 'saves', num: true },
-    { k: 'dmOut', t: 'DM →', num: true },
-    { k: 'dmIn', t: 'DM ←', num: true },
+    { k: 'dmOut', t: 'DMs sent', num: true },
+    { k: 'dmIn', t: 'DMs got', num: true },
     { k: 'views', t: 'posts seen', num: true, title: 'Their posts that appeared in your feed' },
-    { k: 'lastInteraction', t: 'last', render: (r) => ago(r.lastInteraction) },
-    { k: 'score', t: 'closeness', num: true, render: (r) => relScore(r.score),
-      title: 'Relative to your strongest tie (100). Recency-decayed: DM 5, comment 4, save 3, story like 2.5, like 2' },
-  ], rows, { sort: 'score', empty: 'No people yet — ingest an export first.', onRow: (r) => openPerson(r.username) });
+  ].filter((c) => live.includes(c.k));
+
+  table('#people', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'iFollow', t: 'follow', render: relTag },
+    { k: 'score', t: 'closeness', num: true, mag: true, render: (r) => relScore(r.score) },
+    { k: 'lastInteraction', t: 'last touch', render: (r) => ago(r.lastInteraction) },
+    ...optional,
+    { k: 'followedSince', t: 'since', render: (r) => fmtDate(r.followedSince) },
+  ], rows, {
+    sort: 'score', onRow: (r) => openPerson(r.username),
+    empty: allPeople.length ? 'Nobody matches that filter.' : 'No people yet — ingest an export first.',
+  });
+
+  const hidden = Object.keys(WHY_EMPTY).filter((k) => !live.includes(k));
+  const note = $('#pnote');
+  note.innerHTML = 'Click anyone for their full history. Closeness is relative to your strongest tie (100) ' +
+    'and decays with time — a DM counts 5, a comment 4, a save 3, a story like 2.5, a like 2.';
+  if (hidden.length && allPeople.length) {
+    note.innerHTML += '<br>Columns hidden because they are empty for everyone: ' +
+      hidden.map((k) => `<b>${k}</b> (${WHY_EMPTY[k]})`).join('; ') + '.';
+  }
 }
 
-async function loadInbound() {
-  const d = await get('/api/inbound');
-  const caps = $('#captures'); caps.innerHTML = '';
-  const body = $('#inbound-body'); body.innerHTML = '';
+/* =========================================================== connections */
+function card(title, note, id) {
+  return el('div', { class: 'card flush' }, [
+    el('header', {}, [el('h2', { text: title }), el('p', { class: 'note', text: note })]),
+    el('div', { class: 'scroll' }, el('table', { id })),
+  ]);
+}
+function renderConnections() {
+  const body = $('#conn-body'); body.innerHTML = '';
+  const d = STATE.inbound || { captures: [], ghosts: [], superfans: [], reciprocity: [] };
 
-  if (!d.captures.length) {
-    caps.append(el('p', { class: 'empty',
-      text: 'Nothing captured yet. Open one of your posts, click its likes, scroll the list, and hit Save.' }));
-    return;
-  }
-  caps.append(el('p', { class: 'sub',
-    text: `${d.captures.length} capture${d.captures.length === 1 ? '' : 's'} · ` +
-          d.captures.map((c) => `${c.kind.replace('_', ' ')} (${c.people})`).join(' · ') }));
+  body.append(el('div', { class: 'sectitle', text: 'Who engages with you' }));
+  const src = d.captures.length
+    ? `From ${plural(d.captures.length, 'captured list')} plus anything pulled from the API.`
+    : 'Instagram scopes exports to your own actions, so this comes from lists you pull or capture yourself.';
+  body.append(card('Superfans', src, 'sf'));
+  body.append(card('Reciprocity', 'Biggest imbalances first. Positive means you give more than you get.', 'rc'));
 
-  const card = (title, note, id) => {
-    const c = el('div', { class: 'card' }, [
-      el('h2', { text: title }), el('p', { class: 'note', text: note }),
-    ]);
-    const wrap = el('div', { class: 'scroll' }, el('table', { id }));
-    c.append(wrap); body.append(c); return c;
-  };
+  body.append(el('div', { class: 'sectitle', text: 'Who is drifting' }));
+  body.append(card('Followers who never engage',
+    d.ghosts.length || d.captures.length
+      ? 'They follow you but appear in none of the lists you have. Confidence grows with how much you capture.'
+      : 'Needs at least one complete liker list before this can mean anything.', 'gh'));
 
-  card('Superfans', 'Ranked by how much they engage with you.', 'sf');
+  const decayCard = el('div', { class: 'card flush' }, [
+    el('header', {}, [
+      el('h2', { text: 'Mutuals gone quiet' }),
+      el('p', { class: 'note', text: 'Following each other, with nothing between you in the window.' }),
+      (() => {
+        const sel = el('select', { id: 'decaydays', style: 'margin-top:10px' });
+        for (const [v, t] of [[30, 'silent 30 days'], [90, 'silent 90 days'], [180, 'silent 6 months'], [365, 'silent a year']]) {
+          sel.append(el('option', { value: v, text: t, selected: v === 90 }));
+        }
+        sel.onchange = loadDecay;
+        return sel;
+      })(),
+    ]),
+    el('div', { class: 'scroll' }, el('table', { id: 'decay' })),
+  ]);
+  body.append(decayCard);
+  body.append(card('You watch, you never react',
+    'Their posts fill your feed and you leave nothing behind. The clearest one-sided attention in the data.', 'lurk'));
+
   table('#sf', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'likesReceived', t: 'likes given you', num: true },
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'total', t: 'total', num: true, mag: true },
+    { k: 'likesReceived', t: 'likes', num: true },
     { k: 'commentsReceived', t: 'comments', num: true },
     { k: 'storyViews', t: 'story views', num: true },
-    { k: 'total', t: 'total', num: true },
-  ], d.superfans, { sort: 'total', empty: 'No inbound engagement captured.' });
+  ], d.superfans, { sort: 'total', onRow: (r) => openPerson(r.username),
+    empty: 'Nothing inbound yet. Pull post likers from the Data tab to fill this in.' });
 
-  card('Ghost followers',
-    'Follow you, yet appear in none of the lists you have captured. Confidence grows with how many posts you capture.',
-    'gh');
-  table('#gh', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'followedSince', t: 'following you since', render: (r) => fmtDate(r.followedSince) },
-  ], d.ghosts, { sort: 'followedSince', asc: true, empty: 'No ghosts — everyone who follows you has engaged.' });
-
-  card('Reciprocity', 'Biggest imbalances first. Positive means you give more than you get.', 'rc');
   table('#rc', [
-    { k: 'username', t: 'username', asc: true },
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
     { k: 'youGive', t: 'you → them', num: true },
     { k: 'theyGive', t: 'them → you', num: true },
-    { k: 'gap', t: 'gap', num: true },
-  ], d.reciprocity, { sort: 'gap', empty: 'Nothing to compare yet.' });
-}
+    { k: 'gap', t: 'gap', num: true, render: (r) => (r.gap > 0 ? '+' : '') + n0(r.gap) },
+  ], d.reciprocity, { sort: 'gap', onRow: (r) => openPerson(r.username), empty: 'Nothing to compare yet.' });
 
+  table('#gh', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'followedSince', t: 'has followed you since', render: (r) => fmtDate(r.followedSince) },
+  ], d.ghosts, { sort: 'followedSince', asc: true, onRow: (r) => openPerson(r.username),
+    empty: 'Nothing to show — either everyone engages, or no complete list has been captured yet.' });
+
+  table('#lurk', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'views', t: 'posts seen', num: true, mag: true },
+    { k: 'engagements', t: 'times you reacted', num: true },
+  ], STATE.lurkers, { sort: 'views', onRow: (r) => openPerson(r.username),
+    empty: 'No viewing history in this export.' });
+
+  loadDecay();
+}
 async function loadDecay() {
-  const d = await get('/api/decay?days=' + $('#decaydays').value);
+  const sel = $('#decaydays'); if (!sel) return;
+  const d = await get('/api/decay?days=' + sel.value);
   table('#decay', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'daysSilent', t: 'days silent', num: true },
-    { k: 'lastInteraction', t: 'last interaction', render: (r) => r.lastInteraction ? fmtDate(r.lastInteraction) : 'never' },
-  ], d, { sort: 'daysSilent', empty: 'No quiet mutuals in this window.' });
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'daysSilent', t: 'days silent', num: true, mag: true },
+    { k: 'lastInteraction', t: 'last interaction', render: (r) => (r.lastInteraction ? fmtDate(r.lastInteraction) : 'never') },
+  ], d, { sort: 'daysSilent', onRow: (r) => openPerson(r.username), empty: 'No quiet mutuals in this window.' });
 }
 
-async function loadAll() {
-  const [ov, ppl, unf, lurk, hab, tst] = await Promise.all([
-    get('/api/overview'), get('/api/people'), get('/api/unfollowers'),
-    get('/api/lurkers'), get('/api/habits'), get('/api/taste'),
-  ]);
-  Object.assign(STATE, { overview: ov, habits: hab });
-  allPeople = ppl;
-
-  const latest = ov.snapshots[ov.snapshots.length - 1];
-  $('#sub').textContent = ov.snapshots.length === 0
-    ? 'No exports ingested yet — press “Pull new data” once you have one'
-    : `${ov.snapshots.length} snapshot${ov.snapshots.length === 1 ? '' : 's'} · last ${fmtDate(latest.takenAt)}`;
-
-  const mutuals = ppl.filter((p) => p.followsMe && p.iFollow).length;
-  const tiles = [
-    ['followers', latest ? latest.followers : 0], ['following', latest ? latest.following : 0],
-    ['mutuals', mutuals], ['unfollowers', ov.lost], ['new followers', ov.gained],
-    ['interactions', ov.totalInteractions],
+/* =================================================================== you */
+function renderYou() {
+  const t = STATE.taste;
+  const body = $('#taste-body'); body.innerHTML = '';
+  const GROUPS = [
+    ['your_topic', 'Topics Instagram assigned you'],
+    ['ad_interest', 'What advertisers can target you with'],
+    ['ai_interest', 'What its AI inferred'],
   ];
-  $('#tiles').innerHTML = '';
-  for (const [k, v] of tiles) {
-    $('#tiles').append(el('div', { class: 'tile' }, [
-      el('div', { class: 'v', text: v.toLocaleString() }), el('div', { class: 'k', text: k }),
+  let any = false;
+  for (const [kind, label] of GROUPS) {
+    const items = t.topics.filter((x) => x.kind === kind);
+    if (!items.length) continue;
+    any = true;
+    body.append(el('div', { class: 'sectitle', text: `${label} (${n0(items.length)})` }));
+    body.append(el('div', {}, items.map((x) => el('span', { class: 'pill', text: x.value }))));
+  }
+  if (t.hashtags.length) {
+    any = true;
+    body.append(el('div', { class: 'sectitle', text: `Hashtags you follow (${n0(t.hashtags.length)})` }));
+    body.append(el('div', {}, t.hashtags.map((h) => el('span', { class: 'pill', text: '#' + h.value.replace(/^#/, '') }))));
+  }
+  if (t.searches.length) {
+    any = true;
+    body.append(el('div', { class: 'sectitle', text: 'What you searched for' }));
+    body.append(el('div', {}, t.searches.slice(0, 60).map((s) => el('span', { class: 'pill', text: s.term }))));
+  }
+  if (!any) body.append(el('p', { class: 'empty', text: 'No inferred-interest data in this export.' }));
+
+  table('#saved', [
+    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'n', t: 'posts you saved', num: true, mag: true },
+  ], t.savedAuthors, { sort: 'n', onRow: (r) => openPerson(r.username), empty: 'No saved posts in this export.' });
+}
+
+/* ================================================================== data */
+function renderStatus() {
+  const s = STATE.status, ov = STATE.overview;
+  const rows = [
+    [s.snapshots > 0, plural(s.snapshots, 'export'), s.lastExport ? 'Most recent ' + ago(s.lastExport) : 'None ingested'],
+    [s.followers != null, s.followers != null ? n0(s.followers) + ' followers' : 'No follower list', 'From the newest export'],
+    [s.interactions > 0, n0(s.interactions) + ' interactions', 'Attributed to a specific person'],
+    [s.activity > 0, n0(s.activity) + ' unattributed actions', 'Timestamps Instagram no longer names an author for'],
+    [s.impressions > 0, n0(s.impressions) + ' feed impressions', 'Posts that appeared in front of you'],
+    [s.captures > 0, plural(s.captures, 'inbound list'), 'Liker lists pulled or captured'],
+    [s.dmThreads > 0, `${n0(s.dmLinked)} of ${n0(s.dmThreads)} DM threads named`,
+      s.dmLinked < s.dmThreads ? 'Pull DM threads below to name the rest exactly' : 'All matched'],
+    [s.snapshots > 1, plural(s.unfollowers, 'unfollower'), s.snapshots > 1 ? 'Detected by diffing exports' : 'Needs a second export'],
+  ];
+  const list = $('#status-list'); list.innerHTML = '';
+  for (const [ok, title, detail] of rows) {
+    list.append(el('li', {}, [
+      tag(ok ? 'ok' : 'mute', ok ? '✓' : '–'),
+      el('div', { class: 'm' }, [el('div', { text: title }), el('div', { class: 'd', text: detail })]),
+    ]));
+  }
+  if (s.warnings.length) {
+    for (const w of s.warnings) {
+      list.append(el('li', {}, [tag('warn', '!'), el('div', { class: 'm', text: w })]));
+    }
+  }
+
+  const gaps = [
+    [STATE.inbound && STATE.inbound.superfans.some((x) => x.commentsReceived > 0),
+      'Comments on your posts', 'Not in the export at any account tier. Pull them below.'],
+    [STATE.inbound && STATE.inbound.superfans.length > 0,
+      'Who likes your posts', 'Not in the export either. Pull post likers below.'],
+    [ov.snapshots.length > 1, 'Unfollower detection',
+      'Needs two exports. Resolution is however often you export, so a monthly schedule means monthly precision.'],
+    [false, 'Per-like timestamps',
+      'Instagram does not retain them. Imported likes are dated to the post they are on — a proxy, and the reason the heatmap uses your own actions.'],
+    [false, 'Who viewed your profile',
+      'Does not exist at any tier, for anyone. Any app claiming to show it is guessing.'],
+    [false, 'Story viewers older than 24h',
+      'Instagram discards the list when the story expires. Only capturable live.'],
+  ];
+  const gl = $('#gaps-list'); gl.innerHTML = '';
+  for (const [ok, title, detail] of gaps) {
+    gl.append(el('li', {}, [
+      tag(ok ? 'ok' : 'mute', ok ? '✓' : '–'),
+      el('div', { class: 'm' }, [el('div', { text: title }), el('div', { class: 'd', text: detail })]),
+    ]));
+  }
+}
+
+/* ---- pull ---- */
+let pullTimer = null;
+
+async function loadPull() {
+  const info = await get('/api/pull');
+  STATE.pull = info;
+  const banner = $('#pull-banner');
+  banner.innerHTML = '';
+  if (!info.ready) {
+    banner.append(el('div', { class: 'banner bad' }, [
+      el('div', { html: `<b>Can't pull yet.</b> ${info.problem || ''}` }),
+      info.fix ? el('div', { class: 'dim', style: 'margin-top:6px',
+        html: 'Fix: <code>' + info.fix + '</code>' }) : null,
+    ]));
+  }
+  renderPullForm(info);
+  if (info.run) renderRun(info.run);
+  if (info.busy) startPolling(info.busy);
+}
+
+function renderPullForm(info) {
+  const form = $('#pull-form'); form.innerHTML = '';
+  const posts = info.posts || 0;
+  const jobsBox = el('div', { class: 'pull-jobs' });
+  for (const j of info.jobs) {
+    // 3-6s of deliberate pacing per post dominates the wall clock. Posts with
+    // hundreds of likers paginate, so this is a floor, not a promise.
+    const reqs = j.perPost
+      ? (posts ? `${plural(posts, 'post')} · about ${Math.max(1, Math.round((posts * 4.5) / 60))} min, longer for busy posts`
+               : 'one request per post')
+      : 'roughly 5–10 requests · under a minute';
+    const mins = '';
+    const lab = el('label', { class: 'job' }, [
+      el('input', { type: 'checkbox', value: j.id, checked: j.id === 'threads' }),
+      el('div', {}, [
+        el('div', { class: 't', text: j.label }),
+        el('div', { class: 'd', text: j.note }),
+        el('div', { class: 'c', text: reqs + mins }),
+      ]),
+    ]);
+    jobsBox.append(lab);
+  }
+  form.append(jobsBox);
+
+  const input = el('input', {
+    type: 'password', id: 'sid', autocomplete: 'off', spellcheck: 'false',
+    placeholder: 'paste the sessionid cookie value',
+  });
+  form.append(el('label', { class: 'field' }, [
+    el('span', { class: 'lab', text: 'Your Instagram session id' }),
+    input,
+    el('div', { class: 'help', html:
+      'In a browser signed in to Instagram: DevTools → Application → Cookies → ' +
+      '<code>instagram.com</code> → copy <code>sessionid</code>. ' +
+      'It is sent to this program on your own machine, handed to the scraper over a pipe, ' +
+      'and never written to disk or logged. Treat it like a password — it is one.' }),
+  ]));
+
+  const btn = el('button', { class: 'btn primary', text: 'Start pull', disabled: !info.ready });
+  const bar = el('div', { class: 'toolbar', style: 'margin:16px 0 0' }, [
+    btn, el('span', { class: 'count', id: 'pull-hint', text: info.ready ? '' : 'unavailable' }),
+  ]);
+  form.append(bar);
+
+  btn.onclick = async () => {
+    const jobs = [...jobsBox.querySelectorAll('input:checked')].map((i) => i.value);
+    const sessionid = input.value;
+    if (!jobs.length) { $('#pull-hint').textContent = 'Pick at least one thing to pull.'; return; }
+    if (!sessionid.trim()) { $('#pull-hint').textContent = 'Paste your session id first.'; return; }
+    btn.disabled = true;
+    $('#pull-hint').textContent = 'Starting…';
+    try {
+      const run = await post('/api/pull', { jobs, sessionid });
+      // Drop the credential from the DOM the moment it has been handed over.
+      input.value = '';
+      $('#pull-hint').textContent = '';
+      renderRun(run);
+      startPolling(run.id);
+    } catch (e) {
+      $('#pull-hint').textContent = e.message;
+      btn.disabled = false;
+    }
+  };
+}
+
+function startPolling(id) {
+  clearInterval(pullTimer);
+  pullTimer = setInterval(async () => {
+    let run;
+    try { run = await get('/api/pull/' + id); } catch { return; }
+    renderRun(run);
+    if (run.state !== 'running') {
+      clearInterval(pullTimer);
+      pullTimer = null;
+      await loadAll();          // the run already imported; refresh every view
+      go('data');
+      renderRun(run);
+    }
+  }, 1200);
+}
+
+function renderRun(run) {
+  $('#pull-progress-card').hidden = false;
+  const jobLabel = (j) => (STATE.pull?.jobs.find((x) => x.id === j)?.label) || j;
+
+  const running = run.state === 'running';
+  $('#pull-cancel').hidden = !running;
+  $('#pull-cancel').onclick = async () => {
+    try { await post('/api/pull/' + run.id + '/cancel'); } catch { /* already gone */ }
+  };
+  const btn = $('#pull-form button.btn');
+  if (btn) btn.disabled = running || !(STATE.pull && STATE.pull.ready);
+
+  const secs = Math.round(((run.finishedAt || Date.now()) - run.startedAt) / 1000);
+  const dur = secs < 60 ? secs + 's' : Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
+  const words = { running: 'Running', done: 'Finished', failed: 'Failed', cancelled: 'Stopped' };
+  const imported = run.imports.map((i) => i.summary).join(' · ');
+  $('#pull-sub').textContent = `${words[run.state]} · ${run.jobs.map(jobLabel).join(', ')} · ${dur}` +
+    (run.linked ? ` · ${plural(run.linked, 'DM thread')} newly named` : '');
+
+  const bars = $('#pull-bars'); bars.innerHTML = '';
+  for (const j of run.jobs) {
+    const p = run.progress[j] || { done: 0, total: 0 };
+    const pct = p.total ? Math.round((p.done / p.total) * 100) : (run.state === 'done' ? 100 : 0);
+    bars.append(el('div', { class: 'bar-row' + (pct >= 100 ? ' done' : '') }, [
+      el('div', { class: 'top' }, [
+        el('span', { text: jobLabel(j) }),
+        el('span', { class: 'count', text: p.total ? `${n0(p.done)} / ${n0(p.total)}` : (running ? 'waiting…' : '—') }),
+      ]),
+      el('div', { class: 'track' }, el('div', { class: 'fill', style: `width:${pct}%` })),
     ]));
   }
 
-  lineChart('#trend', ov.snapshots);
-  renderPeople();
-  $('#q').oninput = renderPeople;
-  $('#pfilter').onchange = renderPeople;
-
-  table('#unf', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'detectedAt', t: 'detected', render: (r) => fmtDate(r.detectedAt) },
-    { k: 'followedSince', t: 'had followed since', render: (r) => fmtDate(r.followedSince) },
-    { k: 'daysLasted', t: 'days lasted', num: true },
-    { k: 'myScore', t: 'your engagement', num: true, render: (r) => r.myScore.toFixed(1) },
-    { k: 'iStillFollow', t: 'you still follow', render: (r) => bool(r.iStillFollow) },
-  ], unf, { sort: 'detectedAt', empty: 'None detected. Two exports are needed before this works.' });
-
-  table('#lurk', [
-    { k: 'username', t: 'username', asc: true },
-    { k: 'views', t: 'posts seen', num: true },
-    { k: 'engagements', t: 'times engaged', num: true },
-  ], lurk, { sort: 'views', empty: 'No viewing history in this export.' });
-
-  await loadDecay();
-  $('#decaydays').onchange = loadDecay;
-
-  const chips = (mount, items) => {
-    const m = $(mount); m.innerHTML = '';
-    if (!items.length) { m.append(el('p', { class: 'empty', text: 'Nothing recorded.' })); return; }
-    items.forEach((t) => m.append(el('span', { class: 'pill', text: t })));
-  };
-  chips('#topics', tst.topics.map((t) => t.value));
-  chips('#hashtags', tst.hashtags.map((h) => h.value));
-  chips('#searches', tst.searches.map((s) => s.term));
-  table('#saved', [
-    { k: 'username', t: 'username', asc: true }, { k: 'n', t: 'saved posts', num: true },
-  ], tst.savedAuthors, { sort: 'n', empty: 'No saved posts in this export.' });
-
-  // Tabs that fetch their own data need re-running if one is open.
-  if (current === 'inbound') await loadInbound();
-  if (current === 'habits') { heatmap('#heat', hab.heatmap); barChart('#months', hab.byMonth); }
+  const log = $('#pull-log');
+  const stick = log.scrollTop + log.clientHeight >= log.scrollHeight - 24;
+  log.innerHTML = '';
+  for (const e of run.events.slice(-200)) {
+    log.append(el('div', { class: 'e-' + e.kind, text: e.message }));
+  }
+  if (run.state === 'failed' && run.error) log.append(el('div', { class: 'e-error', text: run.error }));
+  if (imported) log.append(el('div', { class: 'e-import', text: 'Imported — ' + imported }));
+  if (stick) log.scrollTop = log.scrollHeight;
 }
 
-// ---- pull new data on demand ----
-function showBanner(html, cls) {
-  const b = $('#banner');
-  b.className = cls || '';
-  b.innerHTML = html;
-  b.hidden = false;
-}
-
+/* ================================================================= boot */
 function describeRefresh(r) {
   const ingested = r.archives.filter((a) => !a.skipped);
   const caps = r.captures.filter((c) => !c.skipped && c.rows > 0);
-
   if (r.found === 0) {
-    return [
-      '<b>Nothing found yet.</b> Request an export in the Instagram app — ' +
-      'Settings → Accounts Center → Your information and permissions → ' +
-      'Download your information → All available information, JSON, All time.',
-      `<div class="dim" style="margin-top:6px">Watching: ${r.scanned.join(' · ')}</div>`,
-    ].join('');
+    return '<b>Nothing found in your folders.</b> <span class="dim">Watching: ' +
+      r.scanned.join(' · ') + '</span>';
   }
-  if (!ingested.length && !caps.length) {
-    return `<b>Up to date.</b> <span class="dim">Nothing new in ${r.scanned.length} folder(s). ` +
-           `${r.archives.length} export(s) and ${r.captures.length} capture(s) already ingested.</span>`;
+  if (!ingested.length && !caps.length && !r.likers.length) {
+    return `<b>Up to date.</b> <span class="dim">Nothing new across ${plural(r.scanned.length, 'folder')}.</span>`;
   }
-
   const bits = [];
   for (const a of ingested) {
-    bits.push(`<b>${a.name}</b>: +${a.gained} follower${a.gained === 1 ? '' : 's'}` +
-              (a.lost.length ? `, <b>${a.lost.length} unfollower${a.lost.length === 1 ? '' : 's'}</b>` : ''));
+    bits.push(`<b>${a.name}</b>: +${plural(a.gained, 'follower')}` +
+      (a.lost.length ? `, <b>${plural(a.lost.length, 'unfollower')}</b>` : ''));
   }
-  for (const c of caps) bits.push(`<b>${c.name}</b>: ${c.rows} inbound rows`);
-  if (r.newUnfollowers.length) {
-    bits.push(`<span class="dim">Left you: ${r.newUnfollowers.join(', ')}</span>`);
-  }
+  for (const c of caps) bits.push(`<b>${c.name}</b>: ${n0(c.rows)} inbound rows`);
+  for (const l of r.likers) bits.push(`<b>${l.name}</b>: ${l.summary}`);
+  if (r.newUnfollowers.length) bits.push('<span class="dim">Left you: ' + r.newUnfollowers.join(', ') + '</span>');
   return bits.join('<br>');
 }
 
 $('#refresh').onclick = async () => {
   const b = $('#refresh');
-  b.disabled = true;
-  b.textContent = 'Checking…';
-  showBanner('<span class="dim">Scanning your folders…</span>');
+  b.disabled = true; b.textContent = 'Checking…';
   try {
-    const res = await fetch('/api/refresh', { method: 'POST' });
-    if (!res.ok) throw new Error('HTTP ' + res.status);
-    const r = await res.json();
-    const anyNew = r.archives.some((a) => !a.skipped) || r.captures.some((c) => !c.skipped && c.rows);
-    showBanner(describeRefresh(r), anyNew ? 'good' : '');
+    const r = await post('/api/refresh');
+    const anyNew = r.archives.some((a) => !a.skipped) ||
+      r.captures.some((c) => !c.skipped && c.rows) || r.likers.length > 0;
+    go('data');
+    $('#pull-banner').innerHTML = '';
+    $('#pull-banner').append(el('div', { class: 'banner ' + (anyNew ? 'ok' : ''), html: describeRefresh(r) }));
     await loadAll();
   } catch (e) {
-    showBanner('<b>Refresh failed.</b> ' + String(e && e.message ? e.message : e), 'bad');
+    go('data');
+    $('#pull-banner').innerHTML = '';
+    $('#pull-banner').append(el('div', { class: 'banner bad', html: '<b>Check failed.</b> ' + e.message }));
   } finally {
-    b.disabled = false;
-    b.textContent = 'Pull new data';
+    b.disabled = false; b.textContent = 'Check folders for new data';
   }
 };
 
-loadAll();
+async function loadAll() {
+  const [ov, ppl, unf, lurk, hab, tst, inb, st] = await Promise.all([
+    get('/api/overview'), get('/api/people'), get('/api/unfollowers'), get('/api/lurkers'),
+    get('/api/habits'), get('/api/taste'), get('/api/inbound'), get('/api/status'),
+  ]);
+  Object.assign(STATE, { overview: ov, habits: hab, taste: tst, inbound: inb,
+    status: st, unfollowers: unf, lurkers: lurk });
+  allPeople = ppl;
+  maxScore = allPeople.reduce((m, p) => Math.max(m, p.score), 0);
+
+  renderToday();
+  renderPeople();
+  renderYou();
+  renderStatus();
+  if (current === 'today') lineChart('#trend', ov.snapshots);
+  if (current === 'you') { heatmap('#heat', hab.heatmap); barChart('#months', hab.byMonth); }
+  if (current === 'connections') renderConnections();
+  $('#watching').textContent = 'Folders checked automatically: ' +
+    ((STATE.scanned || []).join(' · ') || '~/Downloads, ~/Dropbox, Google Drive and iCloud Drive, if present.');
+}
+
+const nav = $('#tabs');
+TABS.forEach(([id, label]) => {
+  const b = el('button', { role: 'tab', text: label, 'aria-selected': id === 'today' });
+  b.onclick = () => go(id);
+  nav.append(b);
+});
+$('#q').oninput = renderPeople;
+$('#pfilter').onchange = renderPeople;
+addEventListener('resize', () => {
+  if (current === 'today') lineChart('#trend', (STATE.overview || { snapshots: [] }).snapshots);
+  if (current === 'you' && STATE.habits) barChart('#months', STATE.habits.byMonth);
+});
+
+const hash = location.hash.slice(1);
+loadAll().then(() => go(TABS.some(([t]) => t === hash) ? hash : 'today'));
 </script>
 </body>
 </html>

@@ -133,8 +133,15 @@ CREATE TABLE IF NOT EXISTS inbound_capture (
 );
 
 CREATE INDEX IF NOT EXISTS ix_edge_snap  ON follow_edge(snapshot_id, direction);
+-- The primary key leads with snapshot_id, so "is this account in the graph at
+-- all?" could not use it and scanned the table once per DM thread: 0.9s of the
+-- status call, on every dashboard load.
+CREATE INDEX IF NOT EXISTS ix_edge_acct  ON follow_edge(account_id);
 CREATE INDEX IF NOT EXISTS ix_inter_acct ON interaction(account_id, kind);
 CREATE INDEX IF NOT EXISTS ix_inter_time ON interaction(occurred_at);
+-- Ghost detection scans every inbound interaction to build the set of people
+-- who have ever engaged; without this it is a full table scan of 109k rows.
+CREATE INDEX IF NOT EXISTS ix_inter_dir  ON interaction(direction, account_id);
 CREATE INDEX IF NOT EXISTS ix_impr_acct  ON impression(account_id);
 CREATE INDEX IF NOT EXISTS ix_event_acct ON graph_event(account_id, kind);
 CREATE INDEX IF NOT EXISTS ix_activity_time ON activity(occurred_at);
