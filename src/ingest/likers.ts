@@ -44,9 +44,17 @@ export function importLikersCsv(db: Db, filePath: string): LikersImport {
     byPost.set(r.post_shortcode, list);
   }
 
+  // Upsert, not insert. Pulling only your most recent posts is the normal way
+  // to top this up, so the same post arrives again and again; a plain insert
+  // added a duplicate capture row every time and inflated the count.
   const insCapture = db.prepare(
-    `INSERT INTO inbound_capture (captured_at, kind, permalink, complete, expected, raw_json)
-     VALUES (?, 'post_likes', ?, ?, ?, ?)`);
+    `INSERT INTO inbound_capture (captured_at, kind, permalink, complete, expected, raw_json, dedupe_key)
+     VALUES (?, 'post_likes', ?, ?, ?, ?, ?)
+     ON CONFLICT(dedupe_key) DO UPDATE SET captured_at = excluded.captured_at,
+                                           permalink   = excluded.permalink,
+                                           complete    = excluded.complete,
+                                           expected    = excluded.expected,
+                                           raw_json    = excluded.raw_json`);
   const insInter = db.prepare(
     `INSERT OR IGNORE INTO interaction
        (account_id, kind, direction, occurred_at, permalink, text, dedupe_key)
@@ -78,7 +86,8 @@ export function importLikersCsv(db: Db, filePath: string): LikersImport {
       if (complete) stats.completePosts++; else stats.partialPosts++;
 
       insCapture.run(postedAt ?? 0, first.post_url || null, complete ? 1 : 0, claimed,
-        JSON.stringify({ source: 'likers.py', shortcode, retrieved: list.length, claimed }));
+        JSON.stringify({ source: 'scrape.py', shortcode, retrieved: list.length, claimed }),
+        `post_likes|${first.post_url || shortcode}`);
 
       insPost.run(postedAt, first.post_url || null, claimed, `post|${shortcode}`);
 

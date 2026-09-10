@@ -45,6 +45,8 @@ export interface PullEvent {
 export interface PullRun {
   id: string;
   jobs: PullJob[];
+  /** Cap on the per-post jobs; 0 means every post. */
+  maxPosts: number;
   startedAt: number;
   finishedAt: number | null;
   state: 'running' | 'done' | 'failed' | 'cancelled';
@@ -137,6 +139,7 @@ export class PullRunner {
     const run: PullRun = {
       id: randomUUID().slice(0, 8),
       jobs: opts.jobs,
+      maxPosts: opts.maxPosts ?? 0,
       startedAt: Date.now(),
       finishedAt: null,
       state: 'running',

@@ -156,6 +156,13 @@ export function postCount(db: Db): number {
   return r.withUrl || r.notStories;
 }
 
+/** Posts that already have a liker list, so the UI can default to a small window. */
+export function capturedPostCount(db: Db): number {
+  return (db.prepare(
+    "SELECT COUNT(DISTINCT permalink) AS c FROM inbound_capture WHERE kind = 'post_likes'",
+  ).get() as { c: number }).c;
+}
+
 export function decay(db: Db, now: number, days: number) {
   const cutoff = now - days * 86400;
   const latest = latestSnapshotId(db);
