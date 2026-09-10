@@ -24,6 +24,8 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
     ddl: 'ALTER TABLE account ADD COLUMN instagram_id TEXT' },
   { table: 'my_post', column: 'like_count',
     ddl: 'ALTER TABLE my_post ADD COLUMN like_count INTEGER' },
+  { table: 'inbound_capture', column: 'dedupe_key',
+    ddl: 'ALTER TABLE inbound_capture ADD COLUMN dedupe_key TEXT' },
 ];
 
 function migrate(db: Db): void {
@@ -31,6 +33,22 @@ function migrate(db: Db): void {
     const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
     if (cols.length && !cols.some((c) => c.name === column)) db.exec(ddl);
   }
+
+  // Give existing per-post captures the key their re-imports will collide with,
+  // so the first pull after this upgrade updates them instead of duplicating.
+  // Only the newest row per post is keyed: if a database somehow already holds
+  // duplicates, keying them all would make the unique index below fail.
+  db.exec(
+    `UPDATE inbound_capture
+        SET dedupe_key = kind || '|' || permalink
+      WHERE dedupe_key IS NULL AND permalink IS NOT NULL AND kind = 'post_likes'
+        AND id = (SELECT MAX(c2.id) FROM inbound_capture c2
+                   WHERE c2.kind = inbound_capture.kind
+                     AND c2.permalink = inbound_capture.permalink)`);
+
+  // This index cannot live in schema.sql: that runs before the ALTER above, so
+  // on an existing database it would reference a column that does not exist yet.
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_capture_key ON inbound_capture(dedupe_key)');
 }
 
 export function openDb(path: string): Db {

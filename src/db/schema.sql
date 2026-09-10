@@ -129,7 +129,11 @@ CREATE TABLE IF NOT EXISTS inbound_capture (
   -- did engage, but the ones it omits prove nothing.
   complete    INTEGER NOT NULL DEFAULT 1,
   expected    INTEGER,
-  raw_json    TEXT NOT NULL
+  raw_json    TEXT NOT NULL,
+  -- Set for API pulls, which are re-run against the same posts routinely.
+  -- Left NULL by the bookmarklet: two scrolls of the same list days apart are
+  -- genuinely two captures. SQLite allows many NULLs in a UNIQUE column.
+  dedupe_key  TEXT
 );
 
 CREATE INDEX IF NOT EXISTS ix_edge_snap  ON follow_edge(snapshot_id, direction);

@@ -214,13 +214,20 @@ but appear in none of your captures), and reciprocity.
 Some things are simply absent from the export at every account tier: who liked
 your posts, who commented on them, and which real account is behind each DM
 thread. Those come from Instagram's private API, and the **Data** tab runs it for
-you — tick what you want, paste your session id, press Start pull. Progress
-streams while it runs and the results import themselves.
+you — tick what you want, choose how far back to go, paste your session id, press
+Start pull. Progress streams while it runs and the results import themselves.
+
+Likers and comments cost about one request per post, so the scope control
+defaults to your **last 3 posts** once you have pulled them all once: the older
+ones are not gaining engagement, and re-fetching forty of them to find two new
+likes is a waste of your rate budget. Re-pulling a post you already have updates
+it and adds anyone new; captures are keyed per post and likes deduplicated per
+person, so repeat pulls never double-count.
 
 `scrape.py` is the script behind the button and runs standalone too:
 
 ```bash
-echo "$SESSIONID" | python3 scrape.py --jobs threads,likers,comments --out data/pulls
+echo "$SESSIONID" | python3 scrape.py --jobs likers --out data/pulls --max-posts 3
 ```
 
 **How the credential is handled.** The session id is a password. It goes to the

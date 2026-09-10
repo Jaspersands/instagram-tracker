@@ -3,7 +3,8 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { Db } from '../db/open.js';
-import { people, overview, decay, habits, taste, person, inbound, postCount } from '../report/queries.js';
+import { people, overview, decay, habits, taste, person, inbound, postCount,
+         capturedPostCount } from '../report/queries.js';
 import { unfollowers, lurkGap } from '../report/reports.js';
 import { status } from '../report/status.js';
 import { refreshAll } from '../auto/refresh.js';
@@ -89,6 +90,7 @@ export function buildServer(db: Db): FastifyInstance {
       fix: pre.fix,
       jobs: PULL_JOBS.map((j) => ({ id: j, ...JOB_INFO[j] })),
       posts: postCount(db),
+      capturedPosts: capturedPostCount(db),
       run: runner.latest(),
       busy: runner.activeRun()?.id ?? null,
     };
@@ -101,15 +103,22 @@ export function buildServer(db: Db): FastifyInstance {
   });
 
   app.post('/api/pull', (req, reply) => {
-    const body = (req.body ?? {}) as { sessionid?: unknown; jobs?: unknown };
+    const body = (req.body ?? {}) as { sessionid?: unknown; jobs?: unknown; maxPosts?: unknown };
     const jobs = Array.isArray(body.jobs) ? body.jobs.filter(isPullJob) as PullJob[] : [];
     const sessionid = typeof body.sessionid === 'string' ? body.sessionid : '';
 
     if (!jobs.length) return reply.code(400).send({ error: 'Pick at least one thing to pull.' });
     if (!sessionid.trim()) return reply.code(400).send({ error: 'A session id is required.' });
 
+    // 0 means every post. Anything else caps the per-post jobs to that many of
+    // your most recent, which is the usual way to top up what you already have.
+    const maxPosts = body.maxPosts === undefined ? 0 : Number(body.maxPosts);
+    if (!Number.isInteger(maxPosts) || maxPosts < 0 || maxPosts > 1000) {
+      return reply.code(400).send({ error: 'How many posts must be a whole number from 0 to 1000.' });
+    }
+
     try {
-      return runner.start(db, { sessionid, jobs });
+      return runner.start(db, { sessionid, jobs, maxPosts });
     } catch (err) {
       if (err instanceof ActivePullError) {
         return reply.code(409).send({ error: err.message, runId: err.runId });

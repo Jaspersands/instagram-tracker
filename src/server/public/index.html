@@ -212,6 +212,14 @@ td.empty, .empty { color:var(--muted); text-align:center; padding:26px 12px; fon
 .job .t { font-weight:600; font-size:14px; }
 .job .d { color:var(--muted); font-size:12.5px; margin-top:2px; }
 .job .c { color:var(--ink-2); font-size:12px; margin-top:5px; font-variant-numeric:tabular-nums; }
+.scope {
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  border:1px solid var(--line); border-radius:var(--r2); padding:12px 15px;
+  margin-bottom:16px; background:var(--surface); font-size:13.5px;
+}
+.scope.off { opacity:.5; }
+.scope select { min-width:0; }
+.scope .d { color:var(--muted); font-size:12.5px; flex:1 1 220px; }
 .field { display:block; margin-bottom:6px; }
 .field .lab { font-weight:600; font-size:13.5px; display:block; margin-bottom:5px; }
 .field input { width:100%; min-width:0; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:13px; }
@@ -1132,26 +1140,70 @@ async function loadPull() {
 function renderPullForm(info) {
   const form = $('#pull-form'); form.innerHTML = '';
   const posts = info.posts || 0;
+
+  // Once you already have liker lists, the reason to pull again is what changed
+  // recently — so default to a small window rather than re-fetching everything.
+  const choices = [3, 5, 10, 25].filter((n) => n < posts);
+  choices.push(0);                                   // 0 = every post
+  const scopeSel = el('select', { id: 'scope' });
+  const preferred = info.capturedPosts > 0 && choices.includes(3) ? 3 : 0;
+  for (const n of choices) {
+    scopeSel.append(el('option', {
+      value: n, selected: n === preferred,
+      text: n === 0 ? 'Every post' : `Last ${n} posts`,
+    }));
+  }
+  const scopeOf = () => {
+    const n = Number(scopeSel.value) || 0;
+    return n === 0 ? posts : Math.min(n, posts);
+  };
+
+  const est = {};
   const jobsBox = el('div', { class: 'pull-jobs' });
   for (const j of info.jobs) {
-    // 3-6s of deliberate pacing per post dominates the wall clock. Posts with
-    // hundreds of likers paginate, so this is a floor, not a promise.
-    const reqs = j.perPost
-      ? (posts ? `${plural(posts, 'post')} · about ${Math.max(1, Math.round((posts * 4.5) / 60))} min, longer for busy posts`
-               : 'one request per post')
-      : 'roughly 5–10 requests · under a minute';
-    const mins = '';
+    const cost = el('div', { class: 'c' });
+    if (j.perPost) est[j.id] = cost;
+    else cost.textContent = 'roughly 5–10 requests · under a minute';
     const lab = el('label', { class: 'job' }, [
       el('input', { type: 'checkbox', value: j.id, checked: j.id === 'threads' }),
       el('div', {}, [
         el('div', { class: 't', text: j.label }),
         el('div', { class: 'd', text: j.note }),
-        el('div', { class: 'c', text: reqs + mins }),
+        cost,
       ]),
     ]);
     jobsBox.append(lab);
   }
   form.append(jobsBox);
+
+  const scopeRow = el('div', { class: 'scope' }, [
+    el('span', { text: 'Go back' }), scopeSel,
+    el('span', { class: 'd', text: 'Applies to likers and comments. Re-pulling a post you already ' +
+      'have updates it and adds anyone new — nothing is counted twice.' }),
+  ]);
+  if (posts > 1) form.append(scopeRow);
+
+  function refresh() {
+    // 3-6s of deliberate pacing per post dominates the wall clock. Posts with
+    // hundreds of likers paginate, so this is a floor, not a promise.
+    const all = Number(scopeSel.value) === 0;
+    const n = scopeOf();
+    const mins = Math.max(1, Math.round((n * 4.5) / 60));
+    for (const cost of Object.values(est)) {
+      // "posts" is what previous pulls found, so for "every post" it is a floor:
+      // anything posted since is discovered during the run, not counted here.
+      cost.textContent = posts
+        ? `${all ? 'about ' : ''}${plural(n, 'post')} · about ${mins} min, longer for busy posts`
+        : 'one request per post';
+    }
+    const perPost = [...jobsBox.querySelectorAll('input:checked')]
+      .some((i) => info.jobs.find((j) => j.id === i.value)?.perPost);
+    scopeRow.classList.toggle('off', !perPost);
+    scopeSel.disabled = !perPost;
+  }
+  scopeSel.onchange = refresh;
+  jobsBox.onchange = refresh;
+  refresh();
 
   const input = el('input', {
     type: 'password', id: 'sid', autocomplete: 'off', spellcheck: 'false',
@@ -1181,7 +1233,7 @@ function renderPullForm(info) {
     btn.disabled = true;
     $('#pull-hint').textContent = 'Starting…';
     try {
-      const run = await post('/api/pull', { jobs, sessionid });
+      const run = await post('/api/pull', { jobs, sessionid, maxPosts: Number(scopeSel.value) || 0 });
       // Drop the credential from the DOM the moment it has been handed over.
       input.value = '';
       $('#pull-hint').textContent = '';
@@ -1213,6 +1265,7 @@ function startPolling(id) {
 function renderRun(run) {
   $('#pull-progress-card').hidden = false;
   const jobLabel = (j) => (STATE.pull?.jobs.find((x) => x.id === j)?.label) || j;
+  const JOB_PER_POST = Object.fromEntries((STATE.pull?.jobs || []).map((x) => [x.id, x.perPost]));
 
   const running = run.state === 'running';
   $('#pull-cancel').hidden = !running;
@@ -1226,7 +1279,10 @@ function renderRun(run) {
   const dur = secs < 60 ? secs + 's' : Math.floor(secs / 60) + 'm ' + (secs % 60) + 's';
   const words = { running: 'Running', done: 'Finished', failed: 'Failed', cancelled: 'Stopped' };
   const imported = run.imports.map((i) => i.summary).join(' · ');
-  $('#pull-sub').textContent = `${words[run.state]} · ${run.jobs.map(jobLabel).join(', ')} · ${dur}` +
+  const scope = run.maxPosts && run.jobs.some((j) => JOB_PER_POST[j])
+    ? ` · last ${run.maxPosts} posts` : '';
+  $('#pull-sub').textContent =
+    `${words[run.state]} · ${run.jobs.map(jobLabel).join(', ')}${scope} · ${dur}` +
     (run.linked ? ` · ${plural(run.linked, 'DM thread')} newly named` : '');
 
   const bars = $('#pull-bars'); bars.innerHTML = '';
