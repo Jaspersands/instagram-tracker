@@ -11,6 +11,7 @@ export interface ListRow { username: string; list: string }
 export interface InteractionRow { username: string; kind: string; direction: 'out' | 'in'; occurredAt: number | null; permalink: string | null; text: string | null }
 export interface ImpressionRow { username: string; kind: string; occurredAt: number | null }
 export interface ActivityRow { kind: string; occurredAt: number | null; permalink: string | null }
+export interface DmThreadRow { threadId: string; folderName: string | null; placeholder: string }
 export interface FileRow { path: string; sourceId: string | null; count: number }
 
 export interface RowSink {
@@ -22,6 +23,7 @@ export interface RowSink {
   search(r: SearchRow): void;
   post(r: MyPostRow): void;
   activity(r: ActivityRow): void;
+  dmThread(r: DmThreadRow): void;
   file(r: FileRow): void;
 }
 
@@ -96,6 +98,7 @@ export function collectingSink() {
     impressions: [] as ImpressionRow[],
     topics: [] as TopicRow[],
     activities: [] as ActivityRow[],
+    dmThreads: [] as DmThreadRow[],
     searches: [] as SearchRow[],
     posts: [] as MyPostRow[],
     files: [] as FileRow[],
@@ -107,6 +110,7 @@ export function collectingSink() {
     search(r: SearchRow) { s.searches.push(r); },
     post(r: MyPostRow) { s.posts.push(r); },
     activity(r: ActivityRow) { s.activities.push(r); },
+    dmThread(r: DmThreadRow) { s.dmThreads.push(r); },
     file(r: FileRow) { s.files.push(r); },
   };
   return s;

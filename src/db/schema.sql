@@ -75,6 +75,17 @@ CREATE TABLE IF NOT EXISTS activity (
   dedupe_key  TEXT NOT NULL UNIQUE
 );
 
+-- DM threads seen in an export. The folder is named
+-- <normalised display name>_<thread id>; instagrapi's direct_threads() reports
+-- the same thread id alongside the real username, so the two join exactly and
+-- no display-name guessing is needed.
+CREATE TABLE IF NOT EXISTS dm_thread (
+  thread_id   TEXT PRIMARY KEY,
+  folder_name TEXT,
+  placeholder TEXT,
+  account_id  INTEGER REFERENCES account(id)
+);
+
 CREATE TABLE IF NOT EXISTS list_membership (
   snapshot_id INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
   account_id  INTEGER NOT NULL REFERENCES account(id),

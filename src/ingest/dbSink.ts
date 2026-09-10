@@ -3,6 +3,7 @@ import type { Db } from '../db/open.js';
 import type {
   RowSink, FollowEdgeRow, ListRow, InteractionRow, ImpressionRow, FileRow,
   ActivityRow,
+  DmThreadRow,
 } from '../parse/parseArchive.js';
 import type { TopicRow, SearchRow, MyPostRow } from '../parse/maps.js';
 
@@ -43,6 +44,12 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     `INSERT OR IGNORE INTO activity (kind, occurred_at, permalink, dedupe_key)
      VALUES (?, ?, ?, ?)`);
 
+  const insThread = db.prepare(
+    `INSERT INTO dm_thread (thread_id, folder_name, placeholder, account_id)
+     VALUES (?, ?, ?, ?)
+     ON CONFLICT(thread_id) DO UPDATE SET folder_name = excluded.folder_name,
+                                          placeholder = excluded.placeholder`);
+
   const files: FileRow[] = [];
 
   return {
@@ -71,6 +78,9 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
       // the same second collapse into one.
       insPost.run(r.postedAt, r.caption, r.mediaType,
         `${r.postedAt ?? ''}|${r.uri ?? ''}|${(r.caption ?? '').slice(0, 80)}`);
+    },
+    dmThread(r: DmThreadRow) {
+      insThread.run(r.threadId, r.folderName, r.placeholder, id(r.placeholder));
     },
     activity(r: ActivityRow) {
       insActivity.run(r.kind, r.occurredAt, r.permalink,

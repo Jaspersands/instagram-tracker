@@ -27,6 +27,11 @@ export function isLikersCsv(name: string): boolean {
   return /likers.*\.csv$/i.test(name) || /^all_instagram_likers\.csv$/i.test(name);
 }
 
+/** Any CSV pulled from the private API; the header decides which importer runs. */
+export function isApiCsv(name: string): boolean {
+  return /^(all_instagram_)?(likers|threads|comments|dm_threads|post_comments).*\.csv$/i.test(name);
+}
+
 export function isExportDir(name: string): boolean {
   if (!/^(instagram|meta|facebook)[-_]/i.test(name)) return false;
   // A ZIP download is dated 2026-09-08; a Drive transfer folder is dated
@@ -121,7 +126,7 @@ export function findInputs(dirs: string[] = candidateDirs()): {
       } else if (e.isFile()) {
         if (isExportArchive(e.name)) archives.push({ path: full, mtime: safeMtime(full) });
         else if (isCaptureName(e.name)) captures.push({ path: full, mtime: safeMtime(full) });
-        else if (isLikersCsv(e.name)) likers.push({ path: full, mtime: safeMtime(full) });
+        else if (isApiCsv(e.name)) likers.push({ path: full, mtime: safeMtime(full) });
       }
     }
   };
