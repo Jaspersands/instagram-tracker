@@ -20,6 +20,10 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
     ddl: 'ALTER TABLE inbound_capture ADD COLUMN complete INTEGER NOT NULL DEFAULT 1' },
   { table: 'inbound_capture', column: 'expected',
     ddl: 'ALTER TABLE inbound_capture ADD COLUMN expected INTEGER' },
+  { table: 'account', column: 'instagram_id',
+    ddl: 'ALTER TABLE account ADD COLUMN instagram_id TEXT' },
+  { table: 'my_post', column: 'like_count',
+    ddl: 'ALTER TABLE my_post ADD COLUMN like_count INTEGER' },
 ];
 
 function migrate(db: Db): void {

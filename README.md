@@ -198,6 +198,33 @@ cannot quietly break them.
 This unlocks the **Inbound** tab: superfans, measured ghost followers (follow you
 but appear in none of your captures), and reciprocity.
 
+## Importing per-post liker lists
+
+`likers.py` (instagrapi, session id, 3-6s pacing) writes
+`all_instagram_likers.csv`: one row per like, per post, with the liker's
+username, display name and numeric Instagram id. Import it with:
+
+```bash
+npm run ingest -- all_instagram_likers.csv
+```
+
+or drop it in a watched folder. Three columns each solve a different problem the
+export could not:
+
+- **username x post** gives real inbound engagement: superfans, engagement decay,
+  and ghost followers measured rather than inferred.
+- **display name** is what Instagram names DM thread folders after. Importing
+  12,623 of them linked 264 previously-orphaned threads in one pass.
+- **numeric id** is a stable identity. The export has none, so a username change
+  looked like one person leaving and another arriving; where an id is known,
+  identity is exact.
+
+A post is marked complete only when the retrieved list reaches the like count
+Instagram itself reported. Short lists (deactivated or blocked accounts) stay
+partial, so their absences are never read as evidence that someone never engaged.
+
+Like timestamps do not exist in this data, so events are dated to the post.
+
 ## What cannot be tracked, and why
 
 - **Profile views.** Not available to personal accounts through any route.

@@ -2,6 +2,7 @@ import { basename } from 'node:path';
 import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
 import { ingestCapture } from '../ingest/ingest.js';
+import { importLikersCsv } from '../ingest/likers.js';
 import { candidateDirs, findInputs } from './discover.js';
 import { localCopyOf, needsStaging } from './staging.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
@@ -11,6 +12,7 @@ export interface RefreshResult {
   found: number;
   archives: { name: string; skipped: boolean; staged: boolean; gained: number; lost: string[] }[];
   captures: { name: string; skipped: boolean; rows: number }[];
+  likers: { name: string; posts: number; likeEvents: number; people: number }[];
   newUnfollowers: string[];
   linked: number;
 }
@@ -24,11 +26,11 @@ export interface RefreshResult {
  */
 export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult> {
   const scanned = dirs ?? candidateDirs();
-  const { archives, captures } = findInputs(scanned);
+  const { archives, captures, likers } = findInputs(scanned);
 
   const result: RefreshResult = {
-    scanned, found: archives.length + captures.length,
-    archives: [], captures: [], newUnfollowers: [], linked: 0,
+    scanned, found: archives.length + captures.length + likers.length,
+    archives: [], captures: [], likers: [], newUnfollowers: [], linked: 0,
   };
 
   for (const a of [...archives].reverse()) {
@@ -45,6 +47,16 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
   for (const c of [...captures].reverse()) {
     const r = await ingestCapture(db, localCopyOf(c.path));
     result.captures.push({ name: basename(c.path), skipped: r.skipped, rows: r.rows });
+  }
+
+  for (const l of likers) {
+    try {
+      const s = importLikersCsv(db, localCopyOf(l.path));
+      result.likers.push({ name: basename(l.path), posts: s.posts,
+                           likeEvents: s.likeEvents, people: s.people });
+    } catch (err) {
+      console.error(`failed to import ${l.path}:`, err);
+    }
   }
 
   // Display names captured just now may resolve DM threads ingested long ago.

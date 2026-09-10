@@ -22,6 +22,11 @@ export function isCaptureName(name: string): boolean {
  * required so an unrelated folder that merely starts with "instagram" is not
  * mistaken for an export.
  */
+/** Output of likers.py — per-post liker lists, which no export contains. */
+export function isLikersCsv(name: string): boolean {
+  return /likers.*\.csv$/i.test(name) || /^all_instagram_likers\.csv$/i.test(name);
+}
+
 export function isExportDir(name: string): boolean {
   if (!/^(instagram|meta|facebook)[-_]/i.test(name)) return false;
   // A ZIP download is dated 2026-09-08; a Drive transfer folder is dated
@@ -96,10 +101,11 @@ function safeMtime(p: string): number {
  * is a network round trip — the naive version took ~50 seconds.
  */
 export function findInputs(dirs: string[] = candidateDirs()): {
-  archives: Found[]; captures: Found[];
+  archives: Found[]; captures: Found[]; likers: Found[];
 } {
   const archives: Found[] = [];
   const captures: Found[] = [];
+  const likers: Found[] = [];
 
   const scan = (dir: string, depth: number) => {
     let entries: Dirent[] = [];
@@ -115,11 +121,16 @@ export function findInputs(dirs: string[] = candidateDirs()): {
       } else if (e.isFile()) {
         if (isExportArchive(e.name)) archives.push({ path: full, mtime: safeMtime(full) });
         else if (isCaptureName(e.name)) captures.push({ path: full, mtime: safeMtime(full) });
+        else if (isLikersCsv(e.name)) likers.push({ path: full, mtime: safeMtime(full) });
       }
     }
   };
 
   for (const dir of dirs) scan(dir, 1);
 
-  return { archives: newestFirst(archives), captures: newestFirst(captures) };
+  return {
+    archives: newestFirst(archives),
+    captures: newestFirst(captures),
+    likers: newestFirst(likers),
+  };
 }

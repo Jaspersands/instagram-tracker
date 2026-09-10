@@ -7,6 +7,12 @@ data/
 *.sqlite
 *.sqlite3
 
+# Liker/follower exports: these name real third parties, with display names
+# and stable Instagram ids. Never commit them.
+*likers*.csv
+all_instagram_likers.csv
+*_likers.csv
+
 # Raw Instagram exports and bookmarklet captures
 exports/
 captures/

@@ -18,6 +18,10 @@ CREATE TABLE IF NOT EXISTS account (
   -- Instagram derives a DM thread's folder name from the display name, not the
   -- username, so without this 85% of threads cannot be joined to the graph.
   display_name TEXT,
+  -- Instagram's own numeric id. The export never includes it, so identity had
+  -- to be inferred from usernames and a rename looked like churn. Where this is
+  -- known, identity is exact.
+  instagram_id TEXT,
   first_seen  INTEGER,
   last_seen   INTEGER,
   merged_into INTEGER REFERENCES account(id)
@@ -84,8 +88,12 @@ CREATE TABLE IF NOT EXISTS my_post (
   caption    TEXT,
   media_type TEXT,
   permalink  TEXT,
+  -- Not in the export at any tier; only obtainable alongside the liker lists.
+  like_count INTEGER,
   dedupe_key TEXT NOT NULL UNIQUE
 );
+
+CREATE INDEX IF NOT EXISTS ix_account_igid ON account(instagram_id);
 
 CREATE TABLE IF NOT EXISTS topic (
   snapshot_id INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,
