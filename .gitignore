@@ -33,6 +33,8 @@ meta-*/
 config.local.json
 
 # ---- standard ----
+__pycache__/
+*.pyc
 node_modules/
 dist/
 build/
