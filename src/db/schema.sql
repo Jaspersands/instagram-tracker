@@ -52,6 +52,10 @@ CREATE TABLE IF NOT EXISTS interaction (
   occurred_at INTEGER,
   permalink   TEXT,
   text        TEXT,
+  -- Which DM thread a message came from. The export names threads by display
+  -- name, and two people can share one, so without this the messages of two
+  -- different Sophies are indistinguishable once attributed.
+  thread_id   TEXT,
   dedupe_key  TEXT NOT NULL UNIQUE
 );
 

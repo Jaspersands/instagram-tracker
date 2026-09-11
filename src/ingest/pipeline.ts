@@ -5,10 +5,16 @@ import { detectRenames, applyRenames } from '../derive/rename.js';
 import { recordEvents } from '../derive/events.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 import { looksIncomplete } from '../derive/sanity.js';
+import { backfillThreads, needsThreadBackfill } from './backfill.js';
 
 export async function ingestAndDerive(db: Db, zipPath: string) {
   const { snapshotId, skipped } = await ingestArchive(db, zipPath);
-  if (skipped) return { snapshotId, skipped, lost: [] as string[], gained: [] as string[], linked: 0, suspicious: false };
+  if (skipped) {
+    // An export seen before a table existed never populates it. Catch up here,
+    // where every refresh passes, so the fix needs no command from anyone.
+    if (needsThreadBackfill(db)) await backfillThreads(db, zipPath);
+    return { snapshotId, skipped, lost: [] as string[], gained: [] as string[], linked: 0, suspicious: false };
+  }
 
   // New DM threads may match display names captured earlier.
   const linked = applyIdentities(db, resolveIdentities(db));

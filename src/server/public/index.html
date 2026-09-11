@@ -350,6 +350,7 @@ svg line.axis { stroke:var(--axis); stroke-width:1; }
         <option value="notback">You follow, they don't</option>
         <option value="idontback">They follow, you don't</option>
         <option value="ghost">Never interacted, either way</option>
+        <option value="unmatched">Unmatched DM names</option>
       </select>
       <span class="spacer"></span>
       <span class="count" id="pcount"></span>
@@ -728,13 +729,17 @@ async function openPerson(username) {
   const head = el('header');
   const xb = el('button', { class: 'x', text: '×', 'aria-label': 'Close' });
   xb.onclick = closeDrawer;
-  head.append(xb, el('h3', { text: '@' + username }));
-
   const r = d.row;
+  head.append(xb, el('h3', { text: r ? handle(r) : '@' + username }));
+
   if (r) {
     head.append(el('p', { class: 'rel', style: 'margin-top:4px' }, [
       relTag(r), el('span', { text: r.followedSince ? '  ·  following you since ' + fmtDate(r.followedSince) : '' }),
     ]));
+    if (r.unmatched) {
+      head.append(el('p', { class: 'note', style: 'margin-top:8px', text:
+        'A display name from a DM folder, not a username. Follow status is unknown until the thread is matched.' }));
+    }
     body.append(el('div', { class: 'statgrid' }, [
       ['closeness', relScore(r.score)], ['likes', r.likes], ['comments', r.comments],
       ['story ♥', r.storyLikes], ['saves', r.saves], ['DMs sent', r.dmOut],
@@ -811,10 +816,15 @@ let allPeople = [];
 let maxScore = 0;
 const relScore = (v) => (maxScore <= 0 ? 0 : Math.round((v / maxScore) * 100));
 const touched = (p) => p.likes + p.comments + p.storyLikes + p.saves + p.dmOut + p.dmIn + p.mentions;
-const relTag = (p) => p.followsMe && p.iFollow ? tag('ok', 'mutual')
+// "no follow" is a claim. For a name lifted from a DM folder it is not a
+// known fact, so it must not be printed as one.
+const relTag = (p) => p.unmatched ? tag('warn', 'unmatched DM')
+  : p.followsMe && p.iFollow ? tag('ok', 'mutual')
   : p.iFollow ? tag('warn', 'you follow')
   : p.followsMe ? tag('mute', 'they follow')
   : tag('mute', 'no follow');
+// A real handle gets an @; a display-name stand-in does not, because it is not one.
+const handle = (p) => (p.unmatched ? p.username : '@' + p.username);
 
 /* ================================================================= today */
 function renderToday() {
@@ -875,7 +885,7 @@ function renderToday() {
   });
 
   table('#close-mini', [
-    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'username', t: 'who', asc: true, who: true, render: handle },
     { k: 'score', t: 'closeness', num: true, mag: true, render: (r) => relScore(r.score) },
     { k: 'lastInteraction', t: 'last', render: (r) => ago(r.lastInteraction) },
   ], [...allPeople].sort((a, b) => b.score - a.score).slice(0, 8), {
@@ -913,6 +923,7 @@ function renderPeople() {
     if (f === 'notback') return p.iFollow && !p.followsMe;
     if (f === 'idontback') return p.followsMe && !p.iFollow;
     if (f === 'ghost') return touched(p) === 0;
+    if (f === 'unmatched') return p.unmatched;
     return true;
   });
   $('#pcount').textContent = `${n0(rows.length)} of ${n0(allPeople.length)}`;
@@ -927,7 +938,7 @@ function renderPeople() {
   ].filter((c) => live.includes(c.k));
 
   table('#people', [
-    { k: 'username', t: 'who', asc: true, who: true, render: (r) => '@' + r.username },
+    { k: 'username', t: 'who', asc: true, who: true, render: handle },
     { k: 'iFollow', t: 'follow', render: relTag },
     { k: 'score', t: 'closeness', num: true, mag: true, render: (r) => relScore(r.score) },
     { k: 'lastInteraction', t: 'last touch', render: (r) => ago(r.lastInteraction) },
@@ -942,6 +953,14 @@ function renderPeople() {
   const note = $('#pnote');
   note.innerHTML = 'Click anyone for their full history. Closeness is relative to your strongest tie (100) ' +
     'and decays with time — a DM counts 5, a comment 4, a save 3, a story like 2.5, a like 2.';
+  const unmatched = allPeople.filter((p) => p.unmatched).length;
+  if (unmatched) {
+    note.innerHTML += `<br><b>${n0(unmatched)} names are unmatched DM threads</b>, shown without an @. ` +
+      'Instagram names each DM folder after a display name and the export never says whose account it is, ' +
+      'so “sophie” is whoever you message who displays as Sophie — quite possibly a mutual whose real ' +
+      'handle is elsewhere in this list. Pulling <b>DM threads</b> on the Data tab resolves every one of ' +
+      'them exactly.';
+  }
   if (hidden.length && allPeople.length) {
     note.innerHTML += '<br>Columns hidden because they are empty for everyone: ' +
       hidden.map((k) => `<b>${k}</b> (${WHY_EMPTY[k]})`).join('; ') + '.';

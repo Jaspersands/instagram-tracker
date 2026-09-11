@@ -16,6 +16,7 @@ import { importApiCsv } from '../ingest/apiCsv.js';
 import { isApiCsv } from '../auto/discover.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
+import { backfillAllThreads } from '../ingest/backfill.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 const [cmd, ...args] = process.argv.slice(2);
@@ -148,6 +149,15 @@ switch (cmd) {
     break;
   }
 
+  case 'backfill': {
+    // Re-register DM threads for exports ingested before dm_thread existed.
+    // Refresh does this on its own; the command is for doing it right now.
+    const r = await backfillAllThreads(openDb(DB_PATH));
+    console.log(`${r.archives} export(s) · ${r.threads} thread(s) registered · ${r.messages} message(s) stamped`);
+    for (const m of r.missing) console.log(`  missing: ${m}`);
+    break;
+  }
+
   case 'daemon': {
     // Dashboard and watcher in one process, so a single LaunchAgent keeps both
     // alive. Running only the watcher meant the dashboard died with whatever
@@ -211,6 +221,7 @@ switch (cmd) {
       '  inventory [zip]          what is in an archive (finds the newest if omitted)',
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
+      '  backfill                 register DM threads from exports ingested before that table existed',
       '  serve                    dashboard on 127.0.0.1',
       '  daemon                   dashboard + watcher together (what the agent runs)',
       '  watch <dir...>           ingest anything that lands, forever',

@@ -1,4 +1,5 @@
 import type { Db } from '../db/open.js';
+import { isTombstone } from './tombstone.js';
 
 /**
  * Instagram names a DM thread folder after the counterpart's *display name*,
@@ -62,6 +63,9 @@ export function resolveIdentities(db: Db): ResolvedIdentity[] {
   const out: ResolvedIdentity[] = [];
 
   for (const o of orphans) {
+    // "Instagram User" is a deleted account, not a person; 99 dead threads
+    // share the name and none of them is anyone in the follow graph.
+    if (isTombstone(o.username)) continue;
     const candidates = byNormalized.get(o.username);
     if (!candidates || candidates.length !== 1) continue;      // absent or ambiguous
     const match = candidates[0];

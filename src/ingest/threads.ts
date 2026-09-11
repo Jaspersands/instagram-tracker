@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import type { Db } from '../db/open.js';
 import { parseCsv } from '../parse/csv.js';
 import { accountId } from './dbSink.js';
+import { isTombstone } from '../derive/tombstone.js';
 
 /**
  * Expected columns, from instagrapi's direct_threads():
@@ -25,12 +26,18 @@ export interface ThreadsImport {
   unmatched: number;
   displayNames: number;
   groupsSkipped: number;
+  /** DM rows moved from a display-name placeholder onto the real account. */
+  messagesMoved: number;
+  /** Messages left on a shared placeholder because nothing says which thread they came from. */
+  ambiguous: number;
+  tombstones: number;
 }
 
 export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
   const rows = parseCsv(readFileSync(filePath, 'utf8'));
   const stats: ThreadsImport = {
     threads: 0, linked: 0, unmatched: 0, displayNames: 0, groupsSkipped: 0,
+    messagesMoved: 0, ambiguous: 0, tombstones: 0,
   };
 
   const findThread = db.prepare(
@@ -41,6 +48,17 @@ export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
       WHERE id = ?`);
   const linkThread = db.prepare('UPDATE dm_thread SET account_id = ? WHERE thread_id = ?');
   const mergeAccount = db.prepare('UPDATE account SET merged_into = ? WHERE id = ? AND id <> ?');
+  // How many folders share this placeholder's display name. One means the
+  // placeholder *is* this person; more means it is a blend that can only be
+  // split message by message, using the thread id stamped on each row.
+  const foldersNamed = db.prepare(
+    'SELECT COUNT(*) AS c FROM dm_thread WHERE placeholder = ?');
+  const moveThread = db.prepare(
+    'UPDATE interaction SET account_id = ? WHERE thread_id = ? AND account_id = ?');
+  const moveAll = db.prepare(
+    "UPDATE interaction SET account_id = ? WHERE account_id = ? AND kind = 'dm'");
+  const leftBehind = db.prepare(
+    "SELECT COUNT(*) AS c FROM interaction WHERE account_id = ? AND kind = 'dm' AND thread_id IS NULL");
 
   // A group thread has several participants; its messages belong to no single
   // person, and merging a placeholder into one of them would be a fabrication.
@@ -62,6 +80,7 @@ export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
 
       const p = participants[0];
       const username = p.username.trim().toLowerCase();
+      if (isTombstone(username)) { stats.tombstones++; continue; }
       const realId = accountId(db, username);
 
       const name = p.full_name?.trim() || null;
@@ -77,10 +96,23 @@ export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
       if (!thread) { stats.unmatched++; continue; }
 
       linkThread.run(realId, threadId);
-      if (thread.account_id !== null && thread.account_id !== realId) {
-        // Point the placeholder created from the folder name at the real person.
-        mergeAccount.run(realId, thread.account_id, realId);
-        stats.linked++;
+      const holder = thread.account_id;
+      if (holder === null || holder === realId) continue;
+
+      stats.linked++;
+      const shared = (foldersNamed.get(thread.placeholder) as { c: number }).c > 1;
+      if (!shared) {
+        // The folder name belongs to exactly one person, so every message on
+        // the placeholder is theirs — including any the backfill could not
+        // stamp — and the placeholder can collapse into them entirely.
+        stats.messagesMoved += moveAll.run(realId, holder).changes;
+        mergeAccount.run(realId, holder, realId);
+      } else {
+        // Two people share this display name. Move only the messages that
+        // carry this thread's id; merging the whole placeholder would hand
+        // one Sophie the other Sophie's conversation.
+        stats.messagesMoved += moveThread.run(realId, threadId, holder).changes;
+        stats.ambiguous = (leftBehind.get(holder) as { c: number }).c;
       }
     }
   })();

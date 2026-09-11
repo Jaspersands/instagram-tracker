@@ -15,7 +15,9 @@ export function isMessageFile(path: string): boolean {
 export function threadIdFromPath(threadPath: string | null): string | null {
   if (!threadPath) return null;
   const last = threadPath.split('/').pop() ?? '';
-  const m = /_(\d{6,})$/.exec(last);
+  // Usually <displayname>_<id>. When the person has no display name at all
+  // the folder is the bare id, and 45 messages went unstamped because of it.
+  const m = /(?:^|_)(\d{6,})$/.exec(last);
   return m ? m[1] : null;
 }
 
@@ -82,6 +84,7 @@ export function parseMessageThread(json: unknown, sink: RowSink): number {
       occurredAt: ms === null ? null : Math.floor(ms / 1000),
       permalink: null,
       text: content === null ? null : fixMojibake(content),
+      threadId,
     });
     emitted++;
   }

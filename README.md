@@ -125,6 +125,10 @@ Five sections, in the order the questions come up:
 - **People** — one searchable directory of everyone. Click a row for that
   person's full timeline. A column that is empty for *everyone* is hidden and
   the reason printed, rather than repeating a misleading zero 7,000 times.
+  Names lifted from DM folders — Instagram's export never says whose account a
+  thread is — are shown without an `@` and tagged **unmatched DM** rather than
+  given a follow status the data cannot support. Pulling DM threads resolves
+  every one exactly.
 - **Connections** — who engages with you, and who is drifting: superfans,
   reciprocity, followers who never engage, quiet mutuals, and accounts you watch
   constantly without reacting.
