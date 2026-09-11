@@ -25,6 +25,38 @@ import time
 
 JOBS = ("likers", "threads", "comments")
 
+# Instagram lets you pin three posts to the top of your profile, and the feed
+# endpoint returns them first regardless of age. Asking it for "the newest 3"
+# could therefore hand back a two-year-old pin. Over-fetch by the pin limit and
+# sort by date ourselves. This costs nothing: a page is one request whether you
+# ask it for 3 items or 6.
+PIN_ALLOWANCE = 3
+
+
+def _when(media):
+    """Sortable epoch for a media. Never raises: a single undated item must not
+    take down a pull that is otherwise fine, and mixing datetime with a numeric
+    fallback is an unorderable-type error waiting to happen."""
+    t = getattr(media, "taken_at", None)
+    if t is None:
+        return 0.0
+    if isinstance(t, (int, float)):
+        return float(t)
+    try:
+        return t.timestamp()
+    except (AttributeError, ValueError, OSError):
+        return 0.0
+
+
+def newest(medias, amount):
+    """The `amount` most recently posted medias, newest first.
+
+    Sorted here rather than trusting the feed's order, which puts pinned posts
+    first and is Instagram's business to change. Undated items sort last.
+    """
+    ordered = sorted(medias, key=_when, reverse=True)
+    return ordered[:amount] if amount else ordered
+
 _SECRET = ""
 
 
@@ -227,9 +259,20 @@ def main() -> int:
     def get_medias():
         nonlocal medias
         if medias is None:
-            emit(event="status", message="Listing your posts…")
-            medias = list(cl.iter_user_medias(me, amount=args.max_posts))
-            emit(event="status", message="Found %d post(s)." % len(medias))
+            want = args.max_posts
+            emit(event="status", message="Listing your posts…" if not want
+                 else "Listing your %d most recent posts…" % want)
+            fetched = list(cl.iter_user_medias(
+                me, amount=(want + PIN_ALLOWANCE) if want else 0))
+            medias = newest(fetched, want)
+            if medias:
+                def day(md):
+                    t = getattr(md, "taken_at", None)
+                    return t.strftime("%Y-%m-%d") if hasattr(t, "strftime") else "unknown"
+                emit(event="status", message="Using %d post(s): %s to %s."
+                     % (len(medias), day(medias[-1]), day(medias[0])))
+            else:
+                emit(event="status", message="No posts found.")
         return medias
 
     files = []
