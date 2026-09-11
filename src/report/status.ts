@@ -73,7 +73,8 @@ export function status(db: Db, now: number): Status {
       warnings.push(
         `${dmThreads - dmLinked} of ${dmThreads} DM threads are not linked to a profile. ` +
         'Instagram names thread folders after display names, which the export omits — ' +
-        'capture your followers list with the bookmarklet to connect them.');
+        'pull DM threads on the Data tab to name them exactly. A conversation the API no ' +
+        'longer returns (deleted, or the account is gone) cannot be, and that is fine.');
     }
   }
 
