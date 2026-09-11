@@ -224,6 +224,11 @@ likes is a waste of your rate budget. Re-pulling a post you already have updates
 it and adds anyone new; captures are keyed per post and likes deduplicated per
 person, so repeat pulls never double-count.
 
+The cap really does stop the work rather than filtering afterwards — a capped run
+makes one listing request plus one per post. "Most recent" is computed from the
+post date rather than taken from Instagram's feed order, because pinned posts are
+returned first regardless of age and would otherwise be mistaken for your latest.
+
 `scrape.py` is the script behind the button and runs standalone too:
 
 ```bash
