@@ -34,6 +34,11 @@ export function importApiCsv(db: Db, filePath: string): { kind: ApiCsvKind; summ
     }
     case 'threads': {
       const s = importThreadsCsv(db, filePath);
+      if (s.wrongIdForm) {
+        return { kind, summary: `${s.threads} threads, none linkable: thread_id holds the API's 39-digit ` +
+          'id, but the export uses thread_v2_id (DirectThread.pk, 15-16 digits). Names and ids were ' +
+          'still recorded; re-run the pull to link threads.' };
+      }
       return { kind, summary: `${s.threads} threads · ${s.linked} linked · ${s.messagesMoved} messages re-attributed · ` +
         `${s.unmatched} not in any export · ${s.groupsSkipped} groups skipped` +
         (s.ambiguous ? ` · ${s.ambiguous} left on a shared name` : '') +

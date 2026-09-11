@@ -31,13 +31,15 @@ export interface ThreadsImport {
   /** Messages left on a shared placeholder because nothing says which thread they came from. */
   ambiguous: number;
   tombstones: number;
+  /** Set when the ids are the API's 39-digit form, which can never match an export. */
+  wrongIdForm: boolean;
 }
 
 export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
   const rows = parseCsv(readFileSync(filePath, 'utf8'));
   const stats: ThreadsImport = {
     threads: 0, linked: 0, unmatched: 0, displayNames: 0, groupsSkipped: 0,
-    messagesMoved: 0, ambiguous: 0, tombstones: 0,
+    messagesMoved: 0, ambiguous: 0, tombstones: 0, wrongIdForm: false,
   };
 
   const findThread = db.prepare(
@@ -64,11 +66,19 @@ export function importThreadsCsv(db: Db, filePath: string): ThreadsImport {
   // person, and merging a placeholder into one of them would be a fabrication.
   const perThread = new Map<string, Record<string, string>[]>();
   for (const r of rows) {
-    if (!r.thread_id || !r.username) continue;
-    const list = perThread.get(r.thread_id) ?? [];
+    // thread_v2_id is what the export uses. Prefer an explicit column, then
+    // thread_id, which scrape.py now fills with the same value.
+    const tid = (r.thread_v2_id || r.thread_id || '').trim();
+    if (!tid || !r.username) continue;
+    const list = perThread.get(tid) ?? [];
     list.push(r);
-    perThread.set(r.thread_id, list);
+    perThread.set(tid, list);
   }
+  // Instagram's private API keys threads on a 39-digit id; the export and the
+  // web client use a 15-16 digit thread_v2_id. A file of long ids joins to
+  // nothing, and "not in any export" is a misleading way to say so.
+  const ids = [...perThread.keys()];
+  stats.wrongIdForm = ids.length > 0 && ids.every((k) => /^\d{30,}$/.test(k));
 
   db.transaction(() => {
     for (const [threadId, participants] of perThread) {

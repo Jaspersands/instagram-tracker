@@ -174,3 +174,33 @@ describe('backfill for exports ingested before thread ids existed', () => {
     expect(needsThreadBackfill(db)).toBe(false);
   });
 });
+
+describe('a threads file in the wrong id form', () => {
+  it('says so, instead of reporting every thread as missing from the export', async () => {
+    const db = openDb(':memory:');
+    await ingestAndDerive(db, makeDir(thread('marcus_100000000000612', 'Marcus', ['a'])));
+    // The API's 39-digit thread id. It can never match a folder name.
+    const s = importThreadsCsv(db, csv([
+      '340282366841710301244259743123798766049,Marcus,False,marcus_penrose,Marcus Penrose,999',
+    ]));
+    expect(s.wrongIdForm).toBe(true);
+    expect(s.linked).toBe(0);
+    // The username and id are still worth keeping.
+    const acct = db.prepare("SELECT instagram_id FROM account WHERE username = 'marcus_penrose'").get() as any;
+    expect(acct.instagram_id).toBe('999');
+  });
+
+  it('prefers an explicit thread_v2_id column when both are present', async () => {
+    const db = openDb(':memory:');
+    await ingestAndDerive(db, makeDir(thread('marcus_100000000000612', 'Marcus', ['a'])));
+    const p = join(mkdtempSync(join(tmpdir(), 'v2-')), 'threads.csv');
+    writeFileSync(p, [
+      'thread_id,thread_v2_id,thread_title,is_group,username,full_name,user_id',
+      '340282366841710301244259743123798766049,100000000000612,Marcus,False,marcus_penrose,Marcus Penrose,999',
+    ].join('\n') + '\n');
+    const s = importThreadsCsv(db, p);
+    expect(s.wrongIdForm).toBe(false);
+    expect(s.linked).toBe(1);
+    expect(dmsOf(db, 'marcus_penrose')).toEqual(['a']);
+  });
+});

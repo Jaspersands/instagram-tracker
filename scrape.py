@@ -190,13 +190,18 @@ def job_threads(cl, out_dir, lo, hi):
     me = cl.user_id
     with open(path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["thread_id", "thread_title", "is_group", "username", "full_name", "user_id"])
+        # A thread has two ids. `pk` is thread_v2_id, the 15-16 digit form the
+        # web client uses and the export names its folders with. `id` is the
+        # 39-digit form the private API keys on. Only the first one joins to
+        # anything we have; writing the second here once linked zero of 654.
+        w.writerow(["thread_id", "thread_title", "is_group", "username", "full_name", "user_id",
+                    "thread_id_long"])
         for n, t in enumerate(threads, 1):
             others = [u for u in (t.users or []) if str(u.pk) != str(me)]
             group = bool(getattr(t, "is_group", False)) or len(others) > 1
             for u in others:
-                w.writerow([t.id, getattr(t, "thread_title", "") or "", group,
-                            u.username, u.full_name, u.pk])
+                w.writerow([getattr(t, "pk", "") or t.id, getattr(t, "thread_title", "") or "", group,
+                            u.username, u.full_name, u.pk, t.id])
             emit(event="progress", job="threads", done=n, total=len(threads),
                  message="%s — %d participant(s)%s" % (t.id, len(others), " (group)" if group else ""))
     return path
