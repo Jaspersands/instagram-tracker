@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
-  isMessageFile, usernameFromThreadPath, fixMojibake, parseMessageThread,
+  isMessageFile, usernameFromThreadPath, fixMojibake, parseMessageThread, threadIdFromPath,
 } from '../../src/parse/messages.js';
 import { collectingSink } from '../../src/parse/parseArchive.js';
 
@@ -75,5 +75,22 @@ describe('parseMessageThread', () => {
     const sink = collectingSink();
     parseMessageThread({ ...thread, messages: [] }, sink);
     expect(sink.interactions).toEqual([]);
+  });
+});
+
+describe('threadIdFromPath', () => {
+  it('reads the id after the display name', () => {
+    expect(threadIdFromPath('inbox/marcus_612189326440592')).toBe('612189326440592');
+  });
+
+  it('reads a bare id when the person has no display name at all', () => {
+    // One real folder here was just the number. Its 45 messages could not be
+    // stamped with a thread, and its "username" became the number itself.
+    expect(threadIdFromPath('inbox/700000000000415')).toBe('700000000000415');
+  });
+
+  it('refuses a short numeric suffix that is not a thread id', () => {
+    expect(threadIdFromPath('inbox/user_2')).toBeNull();
+    expect(threadIdFromPath('inbox/12345')).toBeNull();
   });
 });

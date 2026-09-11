@@ -14,6 +14,7 @@
     "watch": "tsx src/cli/index.ts watch",
     "serve": "tsx src/cli/index.ts serve",
     "status": "tsx src/cli/index.ts status",
+    "backfill": "tsx src/cli/index.ts backfill",
     "auto": "tsx src/cli/index.ts auto",
     "install-agent": "tsx src/cli/index.ts install-agent",
     "uninstall-agent": "tsx src/cli/index.ts uninstall-agent",

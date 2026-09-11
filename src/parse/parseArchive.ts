@@ -8,7 +8,12 @@ import { labelUsername, labelTimestamp, labelUrl, labelValue, labelValueDeep, us
 
 export interface FollowEdgeRow { username: string; direction: 'follows_me' | 'i_follow'; since: number | null }
 export interface ListRow { username: string; list: string }
-export interface InteractionRow { username: string; kind: string; direction: 'out' | 'in'; occurredAt: number | null; permalink: string | null; text: string | null }
+export interface InteractionRow {
+  username: string; kind: string; direction: 'out' | 'in'; occurredAt: number | null;
+  permalink: string | null; text: string | null;
+  /** DM messages only: the thread they came from. */
+  threadId?: string | null;
+}
 export interface ImpressionRow { username: string; kind: string; occurredAt: number | null }
 export interface ActivityRow { kind: string; occurredAt: number | null; permalink: string | null }
 export interface DmThreadRow { threadId: string; folderName: string | null; placeholder: string }

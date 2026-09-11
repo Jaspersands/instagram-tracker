@@ -7,6 +7,22 @@ import type {
 } from '../parse/parseArchive.js';
 import type { TopicRow, SearchRow, MyPostRow } from '../parse/maps.js';
 
+/**
+ * The identity of an interaction row. Deliberately excludes the thread id so
+ * the key is stable across the migration that added it, and a backfill can
+ * find the existing row for a message it re-parses.
+ *
+ * DM timestamps are truncated from ms to seconds, so a bursty exchange puts
+ * several distinct messages in the same second. Without the text in the key
+ * the whole burst collapses to one row. Hashed to keep the index small.
+ */
+export function interactionKey(r: InteractionRow): string {
+  const textKey = r.text
+    ? createHash('sha1').update(r.text).digest('hex').slice(0, 12)
+    : '';
+  return `${r.kind}|${r.username}|${r.occurredAt ?? ''}|${r.permalink ?? ''}|${textKey}`;
+}
+
 export function accountId(db: Db, username: string): number {
   db.prepare('INSERT OR IGNORE INTO account (username) VALUES (?)').run(username);
   return (db.prepare('SELECT id FROM account WHERE username = ?').get(username) as { id: number }).id;
@@ -27,8 +43,8 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     `INSERT OR IGNORE INTO list_membership (snapshot_id, account_id, list) VALUES (?, ?, ?)`);
   const insInter = db.prepare(
     `INSERT OR IGNORE INTO interaction
-       (account_id, kind, direction, occurred_at, permalink, text, dedupe_key)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`);
+       (account_id, kind, direction, occurred_at, permalink, text, thread_id, dedupe_key)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`);
   const insImpr = db.prepare(
     `INSERT OR IGNORE INTO impression (account_id, kind, occurred_at, dedupe_key) VALUES (?, ?, ?, ?)`);
 
@@ -57,15 +73,8 @@ export function createDbSink(db: Db, snapshotId: number): RowSink & { flush(): v
     followEdge(r: FollowEdgeRow) { insEdge.run(snapshotId, id(r.username), r.direction, r.since); },
     list(r: ListRow) { insList.run(snapshotId, id(r.username), r.list); },
     interaction(r: InteractionRow) {
-      // DM timestamps are truncated from ms to seconds, so a bursty exchange
-      // puts several distinct messages in the same second. Without the text in
-      // the key the whole burst collapses to one row. Hashed to keep the index
-      // small.
-      const textKey = r.text
-        ? createHash('sha1').update(r.text).digest('hex').slice(0, 12)
-        : '';
       insInter.run(id(r.username), r.kind, r.direction, r.occurredAt, r.permalink, r.text,
-        `${r.kind}|${r.username}|${r.occurredAt ?? ''}|${r.permalink ?? ''}|${textKey}`);
+        r.threadId ?? null, interactionKey(r));
     },
     impression(r: ImpressionRow) {
       insImpr.run(id(r.username), r.kind, r.occurredAt,

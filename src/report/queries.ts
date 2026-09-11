@@ -1,4 +1,5 @@
 import type { Db } from '../db/open.js';
+import { isTombstone } from '../derive/tombstone.js';
 import { decayedScore } from '../derive/score.js';
 
 export interface PersonRow {
@@ -16,6 +17,14 @@ export interface PersonRow {
   views: number;
   lastInteraction: number | null;
   score: number;
+  /**
+   * A stand-in created from a DM folder name, not a real username. Instagram
+   * names thread folders after display names and the export carries no
+   * username, so "sophie" here is whoever you DM'd who displays as Sophie —
+   * very possibly a mutual whose real handle is elsewhere in this list. Nothing
+   * about their follow status is known until the thread is matched.
+   */
+  unmatched: boolean;
 }
 
 type InterRow = { accountId: number; kind: string; direction: 'out' | 'in'; occurredAt: number | null };
@@ -48,10 +57,15 @@ function canonicalIds(db: Db): Map<number, number> {
 export function people(db: Db, now: number): PersonRow[] {
   const owners = ownerUsernames(db);
   const accounts = (db.prepare(
-    'SELECT id, username FROM account WHERE merged_into IS NULL',
-  ).all() as { id: number; username: string }[])
-    .filter((a) => !owners.has(a.username));
+    'SELECT id, username, instagram_id AS instagramId FROM account WHERE merged_into IS NULL',
+  ).all() as { id: number; username: string; instagramId: string | null }[])
+    .filter((a) => !owners.has(a.username) && !isTombstone(a.username));
   if (accounts.length === 0) return [];
+
+  // Accounts with follow history, so an unfollower with no interactions is
+  // still listed while an emptied placeholder is not.
+  const withEvents = new Set((db.prepare('SELECT DISTINCT account_id AS id FROM graph_event')
+    .all() as { id: number }[]).map((r) => r.id));
 
   const canon = canonicalIds(db);
 
@@ -90,14 +104,23 @@ export function people(db: Db, now: number): PersonRow[] {
     if (list) list.push(r); else byAccount.set(id, [r]);
   }
 
-  return accounts.map((a) => {
+  const out: PersonRow[] = [];
+  for (const a of accounts) {
     const rows = byAccount.get(a.id) ?? [];
+    const inGraph = followsMe.has(a.id) || iFollow.has(a.id);
+    const views = viewMap.get(a.id) ?? 0;
+
+    // A placeholder whose every message has been re-attributed to the real
+    // person is an empty shell; listing it as a person with all zeros is noise.
+    if (!rows.length && !inGraph && !views && !withEvents.has(a.id)) continue;
+
     const n = (kind: string, dir?: 'out' | 'in') =>
       rows.filter((r) => r.kind === kind && (dir === undefined || r.direction === dir)).length;
 
     const times = rows.map((r) => r.occurredAt).filter((t): t is number => t !== null);
+    const dmOnly = rows.length > 0 && rows.every((r) => r.kind === 'dm');
 
-    return {
+    out.push({
       username: a.username,
       followsMe: followsMe.has(a.id),
       iFollow: iFollow.has(a.id),
@@ -109,11 +132,13 @@ export function people(db: Db, now: number): PersonRow[] {
       dmOut: n('dm', 'out'),
       dmIn: n('dm', 'in'),
       mentions: n('mention', 'in'),
-      views: viewMap.get(a.id) ?? 0,
+      views,
       lastInteraction: times.length ? Math.max(...times) : null,
       score: decayedScore(rows.filter((r) => r.direction === 'out'), now),
-    };
-  }).sort((x, y) => y.score - x.score);
+      unmatched: !inGraph && a.instagramId === null && dmOnly,
+    });
+  }
+  return out.sort((x, y) => y.score - x.score);
 }
 
 export function overview(db: Db) {

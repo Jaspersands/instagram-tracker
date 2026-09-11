@@ -26,6 +26,8 @@ const ADDED_COLUMNS: { table: string; column: string; ddl: string }[] = [
     ddl: 'ALTER TABLE my_post ADD COLUMN like_count INTEGER' },
   { table: 'inbound_capture', column: 'dedupe_key',
     ddl: 'ALTER TABLE inbound_capture ADD COLUMN dedupe_key TEXT' },
+  { table: 'interaction', column: 'thread_id',
+    ddl: 'ALTER TABLE interaction ADD COLUMN thread_id TEXT' },
 ];
 
 function migrate(db: Db): void {
@@ -49,6 +51,7 @@ function migrate(db: Db): void {
   // This index cannot live in schema.sql: that runs before the ALTER above, so
   // on an existing database it would reference a column that does not exist yet.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_capture_key ON inbound_capture(dedupe_key)');
+  db.exec('CREATE INDEX IF NOT EXISTS ix_inter_thread ON interaction(thread_id)');
 }
 
 export function openDb(path: string): Db {

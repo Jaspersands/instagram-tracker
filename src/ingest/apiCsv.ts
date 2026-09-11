@@ -34,8 +34,10 @@ export function importApiCsv(db: Db, filePath: string): { kind: ApiCsvKind; summ
     }
     case 'threads': {
       const s = importThreadsCsv(db, filePath);
-      return { kind, summary: `${s.threads} threads · ${s.linked} linked · ${s.unmatched} not in any export · ` +
-        `${s.groupsSkipped} groups skipped` };
+      return { kind, summary: `${s.threads} threads · ${s.linked} linked · ${s.messagesMoved} messages re-attributed · ` +
+        `${s.unmatched} not in any export · ${s.groupsSkipped} groups skipped` +
+        (s.ambiguous ? ` · ${s.ambiguous} left on a shared name` : '') +
+        (s.tombstones ? ` · ${s.tombstones} deleted accounts ignored` : '') };
     }
     default:
       return { kind, summary: 'unrecognised CSV header — see docs/api-imports.md' };
