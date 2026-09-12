@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import type { Db } from '../db/open.js';
-import { buildPublicPayload } from './payload.js';
+import { buildPublicPayload, type PublicPayload } from './payload.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const TEMPLATE = join(here, 'template.html');
@@ -35,10 +35,20 @@ const git = (args: string[], cwd?: string): string =>
  * file: one request, and no second URL sitting there to be indexed or scraped
  * on its own.
  */
-export function renderSite(db: Db, now: number, outDir: string, slug: string | null): void {
+export function renderSite(
+  db: Db, now: number, outDir: string, slug: string | null,
+): { changed: boolean } {
   const payload = buildPublicPayload(db, now);
+  const json = JSON.stringify(payload);
+
+  // Skip the write entirely when only the timestamp moved. Every ingest and
+  // every pull calls this, so without it the repo would collect a commit per
+  // run that changed nothing but generatedAt.
+  const indexPath = join(outDir, 'index.html');
+  if (samePayload(indexPath, payload)) return { changed: false };
+
   const html = readFileSync(TEMPLATE, 'utf8')
-    .replace('__PAYLOAD__', JSON.stringify(payload))
+    .replace('__PAYLOAD__', json)
     .replace(/__REPO__/g, slug ?? '');
 
   mkdirSync(outDir, { recursive: true });
@@ -46,8 +56,23 @@ export function renderSite(db: Db, now: number, outDir: string, slug: string | n
   for (const stale of ['api', 'demo-config.js']) {
     rmSync(join(outDir, stale), { recursive: true, force: true });
   }
-  writeFileSync(join(outDir, 'index.html'), html);
+  writeFileSync(indexPath, html);
   writeFileSync(join(outDir, '.nojekyll'), '');
+  return { changed: true };
+}
+
+/** Is the already-published page carrying the same data, timestamp aside? */
+function samePayload(indexPath: string, next: PublicPayload): boolean {
+  let prev: PublicPayload;
+  try {
+    const m = /const D = (\{[\s\S]*?\});\nconst REPO/.exec(readFileSync(indexPath, 'utf8'));
+    if (!m) return false;
+    prev = JSON.parse(m[1]) as PublicPayload;
+  } catch {
+    return false;
+  }
+  const strip = (p: PublicPayload) => JSON.stringify({ ...p, generatedAt: 0 });
+  return strip(prev) === strip(next);
 }
 
 /**
@@ -63,11 +88,13 @@ export function renderSite(db: Db, now: number, outDir: string, slug: string | n
 export function publish(db: Db, now: number, opts: { outDir?: string; push?: boolean } = {}): PublishResult {
   const outDir = opts.outDir ?? 'docs';
   const slug = repoSlug();
+  let changed: boolean;
   try {
-    renderSite(db, now, outDir, slug);
+    changed = renderSite(db, now, outDir, slug).changed;
   } catch (err) {
     return { wrote: false, pushed: false, reason: `render failed: ${msg(err)}` };
   }
+  if (!changed) return { wrote: false, pushed: false, reason: 'no change' };
   if (opts.push === false) return { wrote: true, pushed: false, reason: 'built, push not requested' };
   if (!slug) return { wrote: true, pushed: false, reason: 'no github remote' };
 

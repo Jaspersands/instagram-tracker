@@ -154,9 +154,14 @@ switch (cmd) {
     // --local builds docs/ without committing or pushing, for a look first.
     const local = args.includes('--local');
     const r = publish(openDb(DB_PATH), now(), { push: !local });
-    console.log(`site ${r.wrote ? 'built' : 'NOT built'} -> docs/  ·  ${r.reason}`);
-    if (!r.pushed && !local) {
-      console.log('Nothing was pushed. Run `npm run publish` again once that is resolved.');
+    if (r.reason === 'no change') {
+      console.log('Public page already matches the data — nothing to publish.');
+    } else if (r.pushed) {
+      console.log('Public page rebuilt and pushed. GitHub Pages redeploys in a minute or so.');
+    } else if (r.wrote && local) {
+      console.log('Public page written to docs/ (not committed). Open docs/index.html to check it.');
+    } else {
+      console.log(`Public page NOT published: ${r.reason}`);
     }
     break;
   }

@@ -1347,6 +1347,9 @@ function describeRefresh(r) {
   for (const c of caps) bits.push(`<b>${c.name}</b>: ${n0(c.rows)} inbound rows`);
   for (const l of r.likers) bits.push(`<b>${l.name}</b>: ${l.summary}`);
   if (r.newUnfollowers.length) bits.push('<span class="dim">Left you: ' + r.newUnfollowers.join(', ') + '</span>');
+  if (r.published && r.published !== 'no change') {
+    bits.push('<span class="dim">Public page: ' + r.published + '</span>');
+  }
   return bits.join('<br>');
 }
 

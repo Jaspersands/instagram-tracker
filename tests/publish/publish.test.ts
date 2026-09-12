@@ -69,3 +69,26 @@ describe('publish', () => {
     expect(r.reason).toMatch(/render failed/);
   });
 });
+
+describe('idempotence', () => {
+  it('does not rewrite when only the timestamp moved', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'pub-'));
+    const d = await db();
+    expect(renderSite(d, NOW, out, null).changed).toBe(true);
+    // Every ingest and every pull calls this; without the check the repo would
+    // collect a commit per run that changed nothing but generatedAt.
+    expect(renderSite(d, NOW + 9999, out, null).changed).toBe(false);
+    expect(publish(d, NOW + 12345, { outDir: out, push: false }))
+      .toMatchObject({ wrote: false, reason: 'no change' });
+  });
+
+  it('does rewrite when the data actually changes', async () => {
+    const out = mkdtempSync(join(tmpdir(), 'pub-'));
+    const d = await db();
+    renderSite(d, NOW, out, null);
+    d.prepare(
+      `INSERT INTO interaction (account_id, kind, direction, occurred_at, dedupe_key)
+       VALUES ((SELECT id FROM account LIMIT 1), 'like_post', 'out', ?, 'new-key')`).run(NOW - 10);
+    expect(renderSite(d, NOW, out, null).changed).toBe(true);
+  });
+});

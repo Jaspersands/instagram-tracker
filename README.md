@@ -150,9 +150,20 @@ the dashboard port with `PORT=`.
 ## The public page
 
 `npm run publish-site` rebuilds a small public page from the database and pushes
-it, which republishes the GitHub Pages site. It also runs automatically after
-every ingest and after every API pull, so the page tracks the data with nothing
-typed — including when the monthly Google Drive transfer lands.
+it, which republishes the GitHub Pages site.
+
+It also runs **automatically**, on every path that changes the data:
+
+| Trigger | Path |
+| --- | --- |
+| The monthly Google Drive transfer lands | background agent's watcher |
+| A bookmarklet capture is dropped in | background agent's watcher |
+| "Check folders for new data" in the dashboard | `refreshAll` |
+| An API pull finishes (likers, comments, DM threads) | pull runner |
+
+So the page tracks the data with nothing typed. It skips the commit when only
+the timestamp would have moved, so repeat runs do not fill the history with
+empty commits.
 
 **It publishes counts, dates and distributions. It names nobody.** Follower and
 following totals, the trend across exports, unfollow timing, the activity
