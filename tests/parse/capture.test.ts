@@ -53,8 +53,8 @@ describe('display names', () => {
       ])));
     const rows = db.prepare('SELECT username, display_name FROM account ORDER BY username').all() as any[];
     expect(rows).toEqual([
-      { username: 'marcusdaley', display_name: 'Marcus' },
       { username: 'harrietvale', display_name: 'Harriet Vale' },
+      { username: 'marcusdaley', display_name: 'Marcus' },
     ]);
   });
 
