@@ -147,6 +147,21 @@ npm run report -- lurkers   # accounts you watch constantly and never engage wit
 The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`, and
 the dashboard port with `PORT=`.
 
+## Live demo
+
+A read-only demo runs on GitHub Pages, built from the synthetic `data/demo.db`
+(every name, DM and number in it is invented). It is the real dashboard UI with
+its API responses frozen to static JSON, so nothing is scraped and no server
+runs. Rebuild it with:
+
+```bash
+npm run build-demo    # regenerates docs/ from data/demo.db
+```
+
+The published site lives in `docs/` and is served by GitHub Pages. It is gated
+by a client-side PIN — a curtain to keep casual visitors out, not a security
+boundary: the files are public and the data behind it is synthetic.
+
 ### Trying it before your export arrives
 
 `data/demo.db` holds a synthetic two-snapshot dataset — 199 followers, 3

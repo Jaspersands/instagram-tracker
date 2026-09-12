@@ -20,7 +20,8 @@
     "uninstall-agent": "tsx src/cli/index.ts uninstall-agent",
     "agent-status": "tsx src/cli/index.ts agent-status",
     "daemon": "tsx src/cli/index.ts daemon",
-    "restart-agent": "tsx src/cli/index.ts install-agent"
+    "restart-agent": "tsx src/cli/index.ts install-agent",
+    "build-demo": "tsx src/demo/export.ts"
   },
   "keywords": [],
   "author": "",
