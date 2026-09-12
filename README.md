@@ -147,20 +147,44 @@ npm run report -- lurkers   # accounts you watch constantly and never engage wit
 The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`, and
 the dashboard port with `PORT=`.
 
-## Live demo
+## The public page
 
-A read-only demo runs on GitHub Pages, built from the synthetic `data/demo.db`
-(every name, DM and number in it is invented). It is the real dashboard UI with
-its API responses frozen to static JSON, so nothing is scraped and no server
-runs. Rebuild it with:
+`npm run publish-site` rebuilds a small public page from the database and pushes
+it, which republishes the GitHub Pages site. It also runs automatically after
+every ingest and after every API pull, so the page tracks the data with nothing
+typed — including when the monthly Google Drive transfer lands.
+
+**It publishes counts, dates and distributions. It names nobody.** Follower and
+following totals, the trend across exports, unfollow timing, the activity
+heatmap, monthly volume, interaction mix, relationship split, closeness spread,
+and Instagram's inferred interests about the account owner.
+
+Explicitly excluded, each for a concrete reason:
+
+| Left out | Why |
+| --- | --- |
+| usernames, display names | 7,200 real people |
+| DM text | 66,713 messages other people wrote |
+| search terms | they contain usernames |
+| saved-post authors | usernames |
+| anything per-person | the point of the exclusion |
+
+The payload is built as a **whitelist** in `src/publish/payload.ts` — every
+field is a count, a date, a bucket, or a string from a fixed vocabulary. A
+denylist would leak the first time a query gained a column.
+`tests/publish/noNames.test.ts` asserts that no username, display name, DM body
+or search term from the database appears in the output, and it runs against the
+real database too. That test is what makes an unattended monthly push safe.
+
+There is no password on the page, because there is nothing on it that needs one.
+A client-side gate on static hosting cannot protect files anyway: the data would
+sit at a plain URL that a lock screen never touches.
+
+Preview without publishing:
 
 ```bash
-npm run build-demo    # regenerates docs/ from data/demo.db
+npm run publish-site -- --local   # writes docs/, no commit, no push
 ```
-
-The published site lives in `docs/` and is served by GitHub Pages. It is gated
-by a client-side PIN — a curtain to keep casual visitors out, not a security
-boundary: the files are public and the data behind it is synthetic.
 
 ### Trying it before your export arrives
 

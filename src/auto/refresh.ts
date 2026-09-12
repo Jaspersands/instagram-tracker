@@ -6,6 +6,7 @@ import { importApiCsv } from '../ingest/apiCsv.js';
 import { candidateDirs, findInputs } from './discover.js';
 import { localCopyOf, needsStaging } from './staging.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
+import { publish } from '../publish/publish.js';
 
 export interface RefreshResult {
   scanned: string[];
@@ -15,6 +16,7 @@ export interface RefreshResult {
   likers: { name: string; kind: string; summary: string }[];
   newUnfollowers: string[];
   linked: number;
+  published: string;
 }
 
 /**
@@ -30,7 +32,7 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
 
   const result: RefreshResult = {
     scanned, found: archives.length + captures.length + likers.length,
-    archives: [], captures: [], likers: [], newUnfollowers: [], linked: 0,
+    archives: [], captures: [], likers: [], newUnfollowers: [], linked: 0, published: '',
   };
 
   for (const a of [...archives].reverse()) {
@@ -60,6 +62,10 @@ export async function refreshAll(db: Db, dirs?: string[]): Promise<RefreshResult
 
   // Display names captured just now may resolve DM threads ingested long ago.
   result.linked = applyIdentities(db, resolveIdentities(db));
+
+  // Keep the public page in step with the data. Counts only, never names, and
+  // it never throws — a publish problem must not fail the ingest.
+  result.published = publish(db, Math.floor(Date.now() / 1000)).reason;
 
   return result;
 }

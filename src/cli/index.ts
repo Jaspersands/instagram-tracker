@@ -17,6 +17,7 @@ import { isApiCsv } from '../auto/discover.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 import { backfillAllThreads } from '../ingest/backfill.js';
+import { publish } from '../publish/publish.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 const [cmd, ...args] = process.argv.slice(2);
@@ -149,6 +150,17 @@ switch (cmd) {
     break;
   }
 
+  case 'publish': {
+    // --local builds docs/ without committing or pushing, for a look first.
+    const local = args.includes('--local');
+    const r = publish(openDb(DB_PATH), now(), { push: !local });
+    console.log(`site ${r.wrote ? 'built' : 'NOT built'} -> docs/  ·  ${r.reason}`);
+    if (!r.pushed && !local) {
+      console.log('Nothing was pushed. Run `npm run publish` again once that is resolved.');
+    }
+    break;
+  }
+
   case 'backfill': {
     // Re-register DM threads for exports ingested before dm_thread existed.
     // Refresh does this on its own; the command is for doing it right now.
@@ -221,6 +233,7 @@ switch (cmd) {
       '  inventory [zip]          what is in an archive (finds the newest if omitted)',
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
+      '  publish                  rebuild the public page from the database and push it',
       '  backfill                 register DM threads from exports ingested before that table existed',
       '  serve                    dashboard on 127.0.0.1',
       '  daemon                   dashboard + watcher together (what the agent runs)',

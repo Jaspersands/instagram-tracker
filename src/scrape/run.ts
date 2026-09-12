@@ -6,6 +6,7 @@ import type { Db } from '../db/open.js';
 import { importApiCsv } from '../ingest/apiCsv.js';
 import { resolveIdentities, applyIdentities } from '../derive/identity.js';
 import { preflight, SCRAPE_SCRIPT } from './python.js';
+import { publish } from '../publish/publish.js';
 
 export const PULL_JOBS = ['threads', 'likers', 'comments'] as const;
 export type PullJob = (typeof PULL_JOBS)[number];
@@ -243,6 +244,9 @@ export class PullRunner {
     if (run.imports.length) {
       // Usernames learned just now can resolve DM threads ingested long ago.
       run.linked = applyIdentities(db, resolveIdentities(db));
+      const p = publish(db, Math.floor(Date.now() / 1000));
+      push(run, { kind: 'import', job: null, done: null, total: null,
+                  message: `public site: ${p.reason}` });
     }
     if (run.state === 'running') run.state = 'done';
     run.finishedAt = Date.now();
