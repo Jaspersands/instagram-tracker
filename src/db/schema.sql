@@ -108,7 +108,6 @@ CREATE TABLE IF NOT EXISTS my_post (
   dedupe_key TEXT NOT NULL UNIQUE
 );
 
-CREATE INDEX IF NOT EXISTS ix_account_igid ON account(instagram_id);
 
 CREATE TABLE IF NOT EXISTS topic (
   snapshot_id INTEGER NOT NULL REFERENCES snapshot(id) ON DELETE CASCADE,

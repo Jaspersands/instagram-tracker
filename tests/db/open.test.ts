@@ -1,4 +1,8 @@
 import { describe, it, expect } from 'vitest';
+import Database from 'better-sqlite3';
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { openDb } from '../../src/db/open.js';
 
 describe('openDb', () => {
@@ -46,5 +50,27 @@ describe('migrations', () => {
     const snap = (db.prepare('PRAGMA table_info(snapshot)').all() as any[]).map((c) => c.name);
     expect(acct).toContain('display_name');
     expect(snap).toContain('owner');
+  });
+});
+
+describe('opening a database created before later columns existed', () => {
+  it('migrates a legacy schema instead of throwing on an index', () => {
+    // schema.sql once indexed instagram_id before migrate() added it, so any
+    // database predating that column failed to open at all.
+    const dir = mkdtempSync(join(tmpdir(), 'legacy-'));
+    const p = join(dir, 'legacy.db');
+    const raw = new Database(p);
+    raw.exec(`CREATE TABLE account (id INTEGER PRIMARY KEY, username TEXT UNIQUE,
+                first_seen INTEGER, last_seen INTEGER, merged_into INTEGER);
+              INSERT INTO account (username) VALUES ('someone');`);
+    raw.close();
+
+    const db = openDb(p);
+    const cols = (db.prepare('PRAGMA table_info(account)').all() as { name: string }[]).map((c) => c.name);
+    expect(cols).toContain('instagram_id');
+    expect(cols).toContain('display_name');
+    // the index that used to fail now exists
+    const idx = db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND name='ix_account_igid'").get();
+    expect(idx).toBeTruthy();
   });
 });

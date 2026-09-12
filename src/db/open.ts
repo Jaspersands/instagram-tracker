@@ -52,6 +52,10 @@ function migrate(db: Db): void {
   // on an existing database it would reference a column that does not exist yet.
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS ux_capture_key ON inbound_capture(dedupe_key)');
   db.exec('CREATE INDEX IF NOT EXISTS ix_inter_thread ON interaction(thread_id)');
+  // Lives here, not in schema.sql: it indexes a migrated column, so on a
+  // database created before that column existed the schema-time CREATE INDEX
+  // would fail with "no such column" before migrate() could add it.
+  db.exec('CREATE INDEX IF NOT EXISTS ix_account_igid ON account(instagram_id)');
 }
 
 export function openDb(path: string): Db {
