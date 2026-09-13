@@ -72,7 +72,11 @@ export function buildServer(db: Db, opts: ServerOptions = {}): FastifyInstance {
           .send(loginPage('Wrong password.'));
       }
       attempts.clear();
-      reply.header('set-cookie', sessionCookie(mintSession(auth), !!opts.secureCookies))
+      // Decide Secure per request, not once at startup: the same server answers
+      // plain http on loopback and https through the tunnel, and a Secure
+      // cookie set on the loopback visit would be dropped by the browser.
+      const https = req.headers['x-forwarded-proto'] === 'https' || !!opts.secureCookies;
+      reply.header('set-cookie', sessionCookie(mintSession(auth), https))
         .redirect('/', 303);
     });
   }

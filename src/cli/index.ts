@@ -17,7 +17,6 @@ import { isApiCsv } from '../auto/discover.js';
 import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 import { backfillAllThreads } from '../ingest/backfill.js';
-import { publish } from '../publish/publish.js';
 import { setPassword, loadAuth, authPath } from '../server/auth.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
@@ -198,22 +197,6 @@ switch (cmd) {
     break;
   }
 
-  case 'publish': {
-    // --local builds docs/ without committing or pushing, for a look first.
-    const local = args.includes('--local');
-    const r = publish(openDb(DB_PATH), now(), { push: !local });
-    if (r.reason === 'no change') {
-      console.log('Public page already matches the data — nothing to publish.');
-    } else if (r.pushed) {
-      console.log('Public page rebuilt and pushed. GitHub Pages redeploys in a minute or so.');
-    } else if (r.wrote && local) {
-      console.log('Public page written to docs/ (not committed). Open docs/index.html to check it.');
-    } else {
-      console.log(`Public page NOT published: ${r.reason}`);
-    }
-    break;
-  }
-
   case 'backfill': {
     // Re-register DM threads for exports ingested before dm_thread existed.
     // Refresh does this on its own; the command is for doing it right now.
@@ -290,7 +273,6 @@ switch (cmd) {
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
       '  set-password             require a password for the dashboard (needed to expose it)',
-      '  publish                  rebuild the public page from the database and push it',
       '  backfill                 register DM threads from exports ingested before that table existed',
       '  serve                    dashboard on 127.0.0.1',
       '  daemon                   dashboard + watcher together (what the agent runs)',

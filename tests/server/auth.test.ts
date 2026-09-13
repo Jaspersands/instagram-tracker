@@ -176,3 +176,29 @@ describe('same-origin check behind a tunnel', () => {
     expect(isSameOrigin(undefined, 'anything')).toBe(true);
   });
 });
+
+describe('cookie security flag follows the actual connection', () => {
+  const withAuth = () => {
+    const p = tmpAuth();
+    setPassword('2021', p);
+    return buildServer(openDb(':memory:'), { authPath: p });
+  };
+  const login = (a: ReturnType<typeof withAuth>, headers: Record<string, string> = {}) =>
+    a.inject({
+      method: 'POST', url: '/login',
+      headers: { 'content-type': 'application/x-www-form-urlencoded', ...headers },
+      payload: 'password=2021',
+    });
+
+  it('omits Secure on a plain loopback visit', async () => {
+    // A Secure cookie set over http://127.0.0.1 is dropped by the browser, so a
+    // startup-wide flag would lock you out locally.
+    const r = await login(withAuth());
+    expect(String(r.headers['set-cookie'])).not.toContain('Secure');
+  });
+
+  it('sets Secure when the tunnel says the client used https', async () => {
+    const r = await login(withAuth(), { 'x-forwarded-proto': 'https' });
+    expect(String(r.headers['set-cookie'])).toContain('Secure');
+  });
+});

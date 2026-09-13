@@ -182,55 +182,29 @@ It is static public hosting, so a client-side gate there would be decoration —
 the data would sit in the page source, reachable without ever loading the lock
 screen. That is why the published page carries no names.
 
-## The public page
+## Reaching it from anywhere
 
-`npm run publish-site` rebuilds a small public page from the database and pushes
-it, which republishes the GitHub Pages site.
+The dashboard runs on this Mac and is published to a private hostname through a
+Cloudflare Tunnel, so the data never leaves the machine and never touches
+GitHub:
 
-It also runs **automatically**, on every path that changes the data:
-
-| Trigger | Path |
-| --- | --- |
-| The monthly Google Drive transfer lands | background agent's watcher |
-| A bookmarklet capture is dropped in | background agent's watcher |
-| "Check folders for new data" in the dashboard | `refreshAll` |
-| An API pull finishes (likers, comments, DM threads) | pull runner |
-
-So the page tracks the data with nothing typed. It skips the commit when only
-the timestamp would have moved, so repeat runs do not fill the history with
-empty commits.
-
-**It publishes counts, dates and distributions. It names nobody.** Follower and
-following totals, the trend across exports, unfollow timing, the activity
-heatmap, monthly volume, interaction mix, relationship split, closeness spread,
-and Instagram's inferred interests about the account owner.
-
-Explicitly excluded, each for a concrete reason:
-
-| Left out | Why |
-| --- | --- |
-| usernames, display names | 7,200 real people |
-| DM text | 66,713 messages other people wrote |
-| search terms | they contain usernames |
-| saved-post authors | usernames |
-| anything per-person | the point of the exclusion |
-
-The payload is built as a **whitelist** in `src/publish/payload.ts` — every
-field is a count, a date, a bucket, or a string from a fixed vocabulary. A
-denylist would leak the first time a query gained a column.
-`tests/publish/noNames.test.ts` asserts that no username, display name, DM body
-or search term from the database appears in the output, and it runs against the
-real database too. That test is what makes an unattended monthly push safe.
-
-There is no password on the page, because there is nothing on it that needs one.
-A client-side gate on static hosting cannot protect files anyway: the data would
-sit at a plain URL that a lock screen never touches.
-
-Preview without publishing:
-
-```bash
-npm run publish-site -- --local   # writes docs/, no commit, no push
 ```
+https://tracker.jaspersands.com  ->  cloudflared  ->  127.0.0.1:4317
+```
+
+Two LaunchAgents keep it up: `com.jaspersands.instagramtracker` (dashboard +
+watcher) and `com.jaspersands.instagramtracker.tunnel` (the tunnel), both
+`RunAtLoad` and `KeepAlive`. The tunnel config is
+`~/.cloudflared/instagram-tracker.yml`.
+
+Nothing is served without the password. Cloudflare sends
+`X-Forwarded-Proto: https`, so session cookies are marked `Secure` over the
+tunnel while still working over plain loopback.
+
+**Nothing is published to GitHub.** There is no static site and no publish step:
+the repo holds code only. Earlier versions pushed an aggregate page to GitHub
+Pages; that is removed, Pages is disabled, and the data is scrubbed from the
+history.
 
 ### Trying it before your export arrives
 

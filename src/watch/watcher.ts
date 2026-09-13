@@ -1,7 +1,6 @@
 import chokidar from 'chokidar';
 import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
-import { publish } from '../publish/publish.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { isCaptureFile } from '../parse/capture.js';
 import { isExportArchive, isExportDir } from '../auto/discover.js';
@@ -37,8 +36,6 @@ export function watchFolder(
         const linked = applyIdentities(db, resolveIdentities(db));
         if (!c.skipped) {
           onIngest({ zipPath, lost: [], captured: c.rows, linked });
-          const pub = publish(db, Math.floor(Date.now() / 1000));
-          console.log(`  public site: ${pub.reason}`);
         }
       } catch (err) {
         console.error(`failed to ingest capture ${zipPath}:`, err);
@@ -52,14 +49,7 @@ export function watchFolder(
     if (!isExportArchive(name) && !isExportDir(name)) return;
     try {
       const r = await ingestAndDerive(db, zipPath);
-      if (!r.skipped) {
-        onIngest({ zipPath, lost: r.lost });
-        // The monthly Drive transfer arrives here, not through refreshAll, so
-        // the public page has to be refreshed on this path too or it silently
-        // stops tracking the data.
-        const p = publish(db, Math.floor(Date.now() / 1000));
-        console.log(`  public site: ${p.reason}`);
-      }
+      if (!r.skipped) onIngest({ zipPath, lost: r.lost });
     } catch (err) {
       console.error(`failed to ingest ${zipPath}:`, err);
     }
