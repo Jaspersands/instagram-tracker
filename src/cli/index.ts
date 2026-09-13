@@ -18,8 +18,26 @@ import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 import { backfillAllThreads } from '../ingest/backfill.js';
 import { publish } from '../publish/publish.js';
+import { setPassword, loadAuth, authPath } from '../server/auth.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
+
+/**
+ * Where to listen. Loopback unless IG_HOST asks for more — and then only with a
+ * password set, because this serves the full social graph and every DM. The
+ * interlock is the point: it makes "expose it" and "protect it" the same step.
+ */
+function bindHost(): string {
+  const want = process.env.IG_HOST;
+  if (!want || want === '127.0.0.1' || want === 'localhost') return '127.0.0.1';
+  if (!loadAuth()) {
+    console.error(
+      `Refusing to bind ${want} with no password set — that would publish your DM history\n` +
+      'to anything that can reach this machine. Set one first:\n\n  npm run set-password\n');
+    process.exit(1);
+  }
+  return want;
+}
 const [cmd, ...args] = process.argv.slice(2);
 const now = () => Math.floor(Date.now() / 1000);
 const date = (t: number | null) => (t === null ? '—' : new Date(t * 1000).toISOString().slice(0, 10));
@@ -150,6 +168,36 @@ switch (cmd) {
     break;
   }
 
+  case 'set-password': {
+    // Read from stdin, never argv: a command line is visible to every process
+    // on this machine via `ps`, the same reason the scraper takes stdin.
+    const { createInterface } = await import('node:readline');
+    const rl = createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    const ask = (q: string): Promise<string> => new Promise((res) => {
+      // Hide the typing.
+      const out = process.stdout as unknown as { write(s: string): boolean };
+      const onData = () => { out.write('\x1b[2K\r' + q); };
+      process.stdin.on('data', onData);
+      rl.question(q, (a) => { process.stdin.off('data', onData); res(a); });
+    });
+    const pw = (await ask('New dashboard password: ')).trim();
+    const again = (await ask('\nAgain: ')).trim();
+    rl.close();
+    process.stdout.write('\n');
+    if (pw !== again) { console.error('They do not match. Nothing changed.'); process.exit(1); }
+    try {
+      setPassword(pw);
+    } catch (err) {
+      console.error(err instanceof Error ? err.message : String(err));
+      process.exit(1);
+    }
+    console.log([
+      `Password set. Stored as a scrypt hash in ${authPath()} (mode 0600), never in the repo.`,
+      'Every page and every API route now needs it. Restart to apply:  npm run restart-agent',
+    ].join('\n'));
+    break;
+  }
+
   case 'publish': {
     // --local builds docs/ without committing or pushing, for a look first.
     const local = args.includes('--local');
@@ -183,9 +231,11 @@ switch (cmd) {
     const dirs = args.length ? args : candidateDirs();
     const db = openDb(DB_PATH);
 
-    const app = buildServer(db);
-    await app.listen({ port, host: '127.0.0.1' });
-    console.log(`dashboard on http://127.0.0.1:${port}`);
+    const host = bindHost();
+    const app = buildServer(db, { secureCookies: process.env.IG_HTTPS === '1' });
+    await app.listen({ port, host });
+    console.log(`dashboard on http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`
+      + (loadAuth() ? '  (password required)' : '  (loopback only, no password set)'));
     console.log(`watching:\n  ${dirs.join('\n  ')}`);
 
     await watchFolder(db, dirs, ({ zipPath, lost, captured, linked }) => {
@@ -203,10 +253,11 @@ switch (cmd) {
 
   case 'serve': {
     const port = Number(process.env.PORT ?? 4317);
-    const app = buildServer(openDb(DB_PATH));
-    // Loopback only: this serves your DM history and full social graph.
-    await app.listen({ port, host: '127.0.0.1' });
-    console.log(`dashboard on http://127.0.0.1:${port}`);
+    const host = bindHost();
+    const app = buildServer(openDb(DB_PATH), { secureCookies: process.env.IG_HTTPS === '1' });
+    await app.listen({ port, host });
+    console.log(`dashboard on http://${host === '0.0.0.0' ? '127.0.0.1' : host}:${port}`
+      + (loadAuth() ? '  (password required)' : '  (loopback only, no password set)'));
     break;
   }
 
@@ -238,6 +289,7 @@ switch (cmd) {
       '  inventory [zip]          what is in an archive (finds the newest if omitted)',
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
+      '  set-password             require a password for the dashboard (needed to expose it)',
       '  publish                  rebuild the public page from the database and push it',
       '  backfill                 register DM threads from exports ingested before that table existed',
       '  serve                    dashboard on 127.0.0.1',

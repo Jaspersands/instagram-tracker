@@ -18,3 +18,25 @@ export function isLocalOrigin(origin: string | undefined): boolean {
   }
   return host === '127.0.0.1' || host === 'localhost' || host === '::1' || host === '[::1]';
 }
+
+/**
+ * Same-origin check for writes.
+ *
+ * Comparing against loopback alone breaks the moment the dashboard is reached
+ * through a tunnel: the browser then sends the tunnel's hostname as Origin, and
+ * a loopback-only test would reject the user's own login form. The correct
+ * question is whether Origin matches the Host this request arrived on.
+ */
+export function isSameOrigin(origin: string | undefined, host: string | undefined): boolean {
+  if (!origin) return true;            // curl and the CLI send none
+  if (origin === 'null') return false; // sandboxed iframe or file:// page
+  let originHost: string;
+  try {
+    const u = new URL(origin);
+    originHost = u.host;               // host includes the port
+  } catch {
+    return false;
+  }
+  if (host && originHost === host) return true;
+  return isLocalOrigin(origin);        // still fine when served on loopback
+}

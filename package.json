@@ -21,7 +21,8 @@
     "agent-status": "tsx src/cli/index.ts agent-status",
     "daemon": "tsx src/cli/index.ts daemon",
     "restart-agent": "tsx src/cli/index.ts install-agent",
-    "publish-site": "tsx src/cli/index.ts publish"
+    "publish-site": "tsx src/cli/index.ts publish",
+    "set-password": "tsx src/cli/index.ts set-password"
   },
   "keywords": [],
   "author": "",

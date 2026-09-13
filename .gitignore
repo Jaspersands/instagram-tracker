@@ -27,6 +27,10 @@ captures/
 instagram-*/
 meta-*/
 
+# The dashboard password hash and session secret. Never commit.
+data/auth.json
+auth.json
+
 # Local config (may contain absolute paths to your watched folders)
 .env
 .env.local

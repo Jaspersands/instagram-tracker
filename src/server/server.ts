@@ -11,19 +11,77 @@ import { refreshAll } from '../auto/refresh.js';
 import { notify, unfollowerMessage } from '../notify/notify.js';
 import { runner, ActivePullError, isPullJob, PULL_JOBS, JOB_INFO, type PullJob } from '../scrape/run.js';
 import { preflight } from '../scrape/python.js';
-import { isLocalOrigin } from './origin.js';
+import { isSameOrigin } from './origin.js';
+import {
+  loadAuth, verifyPassword, mintSession, validSession, readCookie, sessionCookie,
+  Attempts, COOKIE,
+} from './auth.js';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const now = () => Math.floor(Date.now() / 1000);
 
-export function buildServer(db: Db): FastifyInstance {
+export interface ServerOptions {
+  /** Path to the auth file; when a password is set, everything requires a session. */
+  authPath?: string;
+  /** Mark the session cookie Secure — set when served over HTTPS by a tunnel. */
+  secureCookies?: boolean;
+}
+
+export function buildServer(db: Db, opts: ServerOptions = {}): FastifyInstance {
   const app = Fastify({ logger: false });
+  const auth = loadAuth(opts.authPath);
+  const attempts = new Attempts();
+
+  // The login form posts urlencoded; Fastify only parses JSON out of the box.
+  app.addContentTypeParser('application/x-www-form-urlencoded',
+    { parseAs: 'string' }, (_req, body, done) => {
+      const out: Record<string, string> = {};
+      for (const [k, v] of new URLSearchParams(body as string)) out[k] = v;
+      done(null, out);
+    });
+
+  const loginPage = (error = '') =>
+    readFileSync(join(here, 'login.html'), 'utf8').replace('__ERROR__', error);
+
+  // Gate everything before any handler runs. Nothing — not a page, not an API
+  // response — is served without a valid session once a password is set.
+  if (auth) {
+    app.addHook('onRequest', (req, reply, done) => {
+      if (req.url === '/login' || req.url.startsWith('/login?')) return done();
+      if (validSession(readCookie(req.headers.cookie, COOKIE), auth)) return done();
+
+      if (req.method === 'GET' && !req.url.startsWith('/api/')) {
+        reply.code(401).type('text/html; charset=utf-8')
+          .header('cache-control', 'no-store').send(loginPage());
+      } else {
+        reply.code(401).send({ error: 'Not signed in.' });
+      }
+    });
+
+    app.post('/login', (req, reply) => {
+      if (attempts.blocked()) {
+        return reply.code(429).type('text/html; charset=utf-8')
+          .header('retry-after', String(attempts.retryAfter()))
+          .send(loginPage(`Too many attempts. Try again in ${attempts.retryAfter()}s.`));
+      }
+      const body = (req.body ?? {}) as { password?: unknown };
+      const password = typeof body.password === 'string' ? body.password : '';
+      if (!verifyPassword(password, auth)) {
+        attempts.record();
+        return reply.code(401).type('text/html; charset=utf-8')
+          .send(loginPage('Wrong password.'));
+      }
+      attempts.clear();
+      reply.header('set-cookie', sessionCookie(mintSession(auth), !!opts.secureCookies))
+        .redirect('/', 303);
+    });
+  }
 
   // Reject cross-origin writes. See origin.ts — loopback binding is not enough
   // on its own, and one of these routes now carries a credential.
   app.addHook('onRequest', (req, reply, done) => {
     if (req.method === 'GET' || req.method === 'HEAD') return done();
-    if (!isLocalOrigin(req.headers.origin)) {
+    if (!isSameOrigin(req.headers.origin, req.headers.host)) {
       reply.code(403).send({ error: 'Cross-origin request refused.' });
       return;
     }

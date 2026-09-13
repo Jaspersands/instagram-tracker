@@ -147,6 +147,41 @@ npm run report -- lurkers   # accounts you watch constantly and never engage wit
 The database lives at `data/instagram.db`. Override with `IG_DB=/path/to.db`, and
 the dashboard port with `PORT=`.
 
+## Password, and reaching it from another device
+
+The dashboard holds your full social graph and every DM, so it listens on
+loopback and nothing else until you set a password:
+
+```bash
+npm run set-password        # prompts twice, hidden
+npm run restart-agent       # apply it
+```
+
+The password is never stored. `data/auth.json` holds a scrypt hash, a random
+salt and a session-signing secret, mode 0600, and is gitignored. Once set,
+**every page and every API route** returns 401 without a valid session — the
+check runs before any handler, so nothing is served and then hidden. Sessions
+are HMAC-signed cookies, HttpOnly, 30 days, and survive a restart. Wrong
+guesses are throttled to 10 per 5 minutes.
+
+To reach it from your phone, put a tunnel in front of the local server rather
+than opening a port. Tailscale is the least work and never exposes anything
+publicly:
+
+```bash
+tailscale serve --bg 4317   # https URL, only your own logged-in devices
+```
+
+If you do want to bind beyond loopback yourself, `IG_HOST` allows it — but only
+with a password set. Without one it refuses and tells you why, so "expose it"
+and "protect it" are the same step. Set `IG_HTTPS=1` when a tunnel terminates
+TLS, so session cookies are marked `Secure`.
+
+**What is not password-protected, and cannot be:** the GitHub Pages site below.
+It is static public hosting, so a client-side gate there would be decoration —
+the data would sit in the page source, reachable without ever loading the lock
+screen. That is why the published page carries no names.
+
 ## The public page
 
 `npm run publish-site` rebuilds a small public page from the database and pushes
