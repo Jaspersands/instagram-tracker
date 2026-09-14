@@ -21,7 +21,8 @@
     "agent-status": "tsx src/cli/index.ts agent-status",
     "daemon": "tsx src/cli/index.ts daemon",
     "restart-agent": "tsx src/cli/index.ts install-agent",
-    "set-password": "tsx src/cli/index.ts set-password"
+    "set-password": "tsx src/cli/index.ts set-password",
+    "backup": "tsx src/cli/index.ts backup"
   },
   "keywords": [],
   "author": "",

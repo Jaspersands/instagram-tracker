@@ -1,6 +1,7 @@
 import chokidar from 'chokidar';
 import type { Db } from '../db/open.js';
 import { ingestAndDerive } from '../ingest/pipeline.js';
+import { backupDb } from '../backup/backup.js';
 import { ingestCapture } from '../ingest/ingest.js';
 import { isCaptureFile } from '../parse/capture.js';
 import { isExportArchive, isExportDir } from '../auto/discover.js';
@@ -49,7 +50,13 @@ export function watchFolder(
     if (!isExportArchive(name) && !isExportDir(name)) return;
     try {
       const r = await ingestAndDerive(db, zipPath);
-      if (!r.skipped) onIngest({ zipPath, lost: r.lost });
+      if (!r.skipped) {
+        onIngest({ zipPath, lost: r.lost });
+        // An export is a point-in-time picture; once ingested, the accumulated
+        // history is only in this database. Snapshot it while it is fresh.
+        const b = backupDb(db);
+        console.log(b.path ? `  backed up to ${b.path}` : `  backup failed: ${b.reason}`);
+      }
     } catch (err) {
       console.error(`failed to ingest ${zipPath}:`, err);
     }

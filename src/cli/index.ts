@@ -18,6 +18,7 @@ import { proposeRegistry } from '../archive/inventory.js';
 import { installAgent, uninstallAgent, agentStatus } from '../auto/install.js';
 import { backfillAllThreads } from '../ingest/backfill.js';
 import { setPassword, loadAuth, authPath } from '../server/auth.js';
+import { backupDb, listBackups } from '../backup/backup.js';
 
 const DB_PATH = process.env.IG_DB ?? 'data/instagram.db';
 
@@ -197,6 +198,18 @@ switch (cmd) {
     break;
   }
 
+  case 'backup': {
+    const b = backupDb(openDb(DB_PATH));
+    console.log(b.path ? `Backed up to ${b.path}` : `Backup failed: ${b.reason}`);
+    if (b.pruned.length) console.log(`  pruned ${b.pruned.length} older backup(s)`);
+    const all = listBackups();
+    for (const f of all) {
+      console.log(`  ${f.name}  ${(f.size / 1048576).toFixed(1)} MB`);
+    }
+    if (!all.length) console.log('  (none yet)');
+    break;
+  }
+
   case 'backfill': {
     // Re-register DM threads for exports ingested before dm_thread existed.
     // Refresh does this on its own; the command is for doing it right now.
@@ -272,6 +285,7 @@ switch (cmd) {
       '  inventory [zip]          what is in an archive (finds the newest if omitted)',
       '  ingest <zip|capture>     ingest one file',
       '  report [unfollowers|lurkers]',
+      '  backup                   snapshot the database and list existing backups',
       '  set-password             require a password for the dashboard (needed to expose it)',
       '  backfill                 register DM threads from exports ingested before that table existed',
       '  serve                    dashboard on 127.0.0.1',

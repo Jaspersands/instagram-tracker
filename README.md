@@ -182,6 +182,26 @@ It is static public hosting, so a client-side gate there would be decoration —
 the data would sit in the page source, reachable without ever loading the lock
 screen. That is why the published page carries no names.
 
+## Backups
+
+An export is a point-in-time picture. If this database is lost, the follower
+history it accumulated cannot be recovered — Instagram will only ever hand you
+*today's* list again, and the DM history is gone for good. So every successful
+ingest snapshots the database, keeping the five most recent:
+
+```bash
+npm run backup          # snapshot now, and list what exists
+```
+
+Backups land in `data/backups/` (gitignored) via SQLite's `VACUUM INTO`, not a
+file copy — copying while the write-ahead log holds uncommitted pages produces a
+backup that opens fine and then fails. They compact on the way out: 44 MB live
+becomes ~35 MB.
+
+They are on the same disk as the original, which protects against corruption and
+mistakes but not against losing the machine. Copying `data/backups/` somewhere
+else occasionally is worth doing.
+
 ## Reaching it from anywhere
 
 The dashboard runs on this Mac and is published to a private hostname through a
